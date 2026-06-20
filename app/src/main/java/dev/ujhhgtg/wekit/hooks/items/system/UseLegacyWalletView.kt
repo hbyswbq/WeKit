@@ -20,11 +20,12 @@ object UseLegacyWalletView : SwitchHookItem(), IResolveDex {
         }
 
         methodMoreTabUIHandlePrefOnClick.hookBefore {
-            val field = (args[1] as Preference).reflekt()
+            val field = Preference::class.reflekt()
                 .firstField { type = String::class }
 
-            if (field.get() as? String? == "settings_mm_cardpackage_new") {
-                field.set("settings_mm_cardpackage")
+            val pref = args[1] as Preference
+            if (field.get(pref) as? String? == "settings_mm_cardpackage_new") {
+                field.set(pref, "settings_mm_cardpackage")
             }
         }
     }

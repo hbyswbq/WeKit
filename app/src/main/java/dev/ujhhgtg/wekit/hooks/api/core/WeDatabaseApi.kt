@@ -6,6 +6,7 @@ import com.tencent.wcdb.DatabaseErrorHandler
 import com.tencent.wcdb.database.SQLiteCipherSpec
 import com.tencent.wcdb.database.SQLiteDatabase
 import dev.ujhhgtg.comptime.This
+import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.wekit.constants.Preferences
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
@@ -20,7 +21,6 @@ import dev.ujhhgtg.wekit.hooks.core.ApiHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.reflection.BString
-import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.wekit.utils.reflection.int
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -341,7 +341,10 @@ object WeDatabaseApi : ApiHookItem(), IResolveDex {
     private fun initializeDatabase(storageObj: Any) {
         val wrapperObj = storageObj.reflekt()
             .firstField {
-                type = classSqliteDbWrapper.clazz
+                type {
+                    it == classSqliteDbWrapper.clazz ||
+                        it == classSqliteDbWrapper.clazz.interfaces[0]
+                }
             }.get() ?: return
 
         db = wrapperObj.reflekt()
