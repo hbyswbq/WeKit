@@ -24,7 +24,13 @@ open class BaseReflectedMethod(open val self: Method) {
 }
 
 open class ReflectedMethod<T>(override val self: Method) : BaseReflectedMethod(self) {
-    fun invoke(vararg args: Any?): Any? {
+
+    fun invoke(instance: T?, vararg args: Any?): Any? {
+        self.makeAccessible()
+        return self.invoke(instance, *args)
+    }
+
+    fun invokeStatic(vararg args: Any?): Any? {
         self.makeAccessible()
         return self.invoke(null, *args)
     }
@@ -34,6 +40,7 @@ class InstanceReflectedMethod<T : Any>(
     private val instance: T,
     override val self: Method
 ) : BaseReflectedMethod(self) {
+
     fun invoke(vararg args: Any?): Any? {
         self.makeAccessible()
         return self.invoke(instance, *args)

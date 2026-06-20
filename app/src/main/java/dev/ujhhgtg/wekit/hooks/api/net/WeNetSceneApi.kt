@@ -18,7 +18,7 @@ object WeNetSceneApi : ApiHookItem(), IResolveDex {
         val queue = classMmKernel.clazz.reflekt()
             .firstMethod {
                 returnType = methodAddNetSceneToQueue.method.declaringClass
-            }.invoke()!!
+            }.invokeStatic()!!
         methodAddNetSceneToQueue.method.invoke(queue, netScene, 0)
     }
 

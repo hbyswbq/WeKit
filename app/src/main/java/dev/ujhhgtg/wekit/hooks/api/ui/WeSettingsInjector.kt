@@ -2,10 +2,10 @@ package dev.ujhhgtg.wekit.hooks.api.ui
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import com.tencent.mm.plugin.setting.ui.setting.SettingsUI
 import com.tencent.mm.plugin.setting.ui.setting_new.base.BaseSettingPrefUI
 import com.tencent.mm.plugin.setting.ui.setting_new.base.BaseSettingUI
 import com.tencent.mm.plugin.setting.ui.setting_new.settings.SettingAdditionHeaderSearch
@@ -15,7 +15,6 @@ import com.tencent.mm.plugin.setting.ui.setting_new.settings.SettingGroupPersona
 import com.tencent.mm.ui.LauncherUI
 import com.tencent.mm.ui.base.preference.IconPreference
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
 import dev.ujhhgtg.comptime.This
 import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.reflekt.utils.isBuiltin
@@ -28,12 +27,9 @@ import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.hooks.core.ApiHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
-import dev.ujhhgtg.wekit.preferences.WePrefs
-import dev.ujhhgtg.wekit.ui.content.CategorySettingsScreen
 import dev.ujhhgtg.wekit.ui.content.MainSettingsScreen
 import dev.ujhhgtg.wekit.ui.utils.ExtensionIcon
 import dev.ujhhgtg.wekit.utils.WeLogger
-import dev.ujhhgtg.wekit.utils.android.Intent
 import dev.ujhhgtg.wekit.utils.reflection.bool
 import dev.ujhhgtg.wekit.utils.reflection.int
 import org.luckypray.dexkit.DexKitBridge
@@ -254,8 +250,7 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex, WeHomeScreenPopupMenuApi
             name = "initView"
             parameterCount = 0
         }.hookAfter {
-            val activity = thisObject as Activity
-            val context = activity as Context
+            val context = thisObject as SettingsUI
 
             try {
                 val prefInstance = IconPreference(context)
@@ -263,12 +258,12 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex, WeHomeScreenPopupMenuApi
                 methodSetKey.method.invoke(prefInstance, PREFS_KEY)
                 methodSetTitle.method.invoke(prefInstance, PREFS_TITLE)
 
-                val prefScreen = XposedHelpers.callMethod(activity, "getPreferenceScreen")
+                val prefScreen = context.reflekt().invokeMethod("getPreferenceScreen")
 
                 methodAddPref.method.invoke(prefScreen, prefInstance, 0)
 
             } catch (e: Throwable) {
-                WeLogger.e(TAG, "插入选项失败", e)
+                WeLogger.e(TAG, "failed to insert pref item", e)
             }
         }
 
@@ -377,141 +372,142 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex, WeHomeScreenPopupMenuApi
             mGetPageGroupItemClass, mGetLevel, mOnClick, mGetKey, mGetSettingLocation, mGetNameResId, mGetGroupNameResId, mGetSwitchState, mGetSwitchProperty
         )
 
-        val item1 = settingsManager.createItem {
+        settingsManager.createItem {
             key = "SettingGroup_Main_WeKitTest1"
             title = "WeKit 设置"
             level = 1
             groupTitle = "插件"
             pageClass = SettingGroupMain::class.java
             parentClass = SettingAdditionHeaderSearch::class.java
-            onClick = { openSettingsDialog(it) }
-        }
-
-        val item2 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest2"
-            title = "测试 - WeKit 设置"
-            level = 1
-            pageClass = SettingGroupMain::class.java
-            parentClass = item1
-            onClick = { openSettingsDialog(it) }
-        }
-
-        val item3 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest3"
-            title = "测试 2 - WeKit 设置 - 详细日志"
-            level = 1
-            isSwitch = true
-            pageClass = SettingGroupMain::class.java
-            parentClass = item2
-
-            switchState = { Preferences.verboseLog }
-            onSwitchChanged = { Preferences.verboseLog = it }
-        }
-
-        // --- doesn't work ---
-        val group = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKit"
-            title = "测试 3 - WeKit 设置 - 原生"
-//            groupTitle = "测试"
-            level = 1
-            pageClass = SettingGroupMain::class.java
-            parentClass = item3
-
-            onClick = {
-                val subPageIntent = Intent {
-                    putExtra("key_config_item", "SettingGroup_Main_WeKit")
-                    putExtra("page_name_kv", "SettingGroup_Main_WeKit")
-                    putExtra("ui_version", 2)
-                    putExtra("setting_from_source", it.intent.getIntExtra("setting_from_source", 2))
-                    putExtra("setting_level", 2)
-                    putExtra("setting_page_time", System.currentTimeMillis().toString())
-                    putStringArrayListExtra("key_intent_action_uic_list", arrayListOf(classIntentAction.clazz.name))
-//                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-
-                methodPluginHelperLaunchIntent.method.invoke(null,
-                    it, "setting", ".ui.setting_new.CommonSettingsUI", subPageIntent, true, null)
-            }
-        }
-
-//        val newPagePageClass = SettingGroupMain::class.java
-        val newPagePageClass = group
-
-        val newPageItem1 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKit_Test1"
-            title = "聊天"
-            groupTitle = "功能"
-            level = 2
-            pageClass = newPagePageClass
-            parentClass = null
-
-            onClick = { CategorySettingsScreen("聊天").show(it) }
-        }
-
-        val newPageItem2 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKit_Test2"
-            title = "联系人与群组"
-            level = 2
-            pageClass = newPagePageClass
-            parentClass = newPageItem1
-
-            onClick = { CategorySettingsScreen("联系人与群组").show(it) }
-        }
-
-        val newPageItem3 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKit_Test3"
-            title = "红包与支付"
-            level = 2
-            pageClass = newPagePageClass
-            parentClass = newPageItem2
-
-            onClick = { CategorySettingsScreen("红包与支付").show(it) }
-        }
-        // --- end doesn't work ---
-
-        val item4 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest4"
-            title = "聊天"
-            groupTitle = "插件 - 功能"
-            level = 1
-            pageClass = SettingGroupMain::class.java
-            parentClass = group
-
-            onClick = { CategorySettingsScreen("聊天").show(it) }
-        }
-
-        val item5 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest5"
-            title = "聊天 - 阻止消息撤回 3"
-            level = 1
-            isSwitch = true
-            pageClass = SettingGroupMain::class.java
-            parentClass = item4
-
-            switchState = { WePrefs.getBoolOrFalse("阻止消息撤回 3") }
-            onSwitchChanged = { WePrefs.putBool("阻止消息撤回 3", it) }
-        }
-
-        val item6 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest6"
-            title = "联系人与群组"
-            level = 1
-            pageClass = SettingGroupMain::class.java
-            parentClass = item5
-
-            onClick = { CategorySettingsScreen("联系人与群组").show(it) }
-        }
-
-        val item7 = settingsManager.createItem {
-            key = "SettingGroup_Main_WeKitTest7"
-            title = "红包与支付"
-            level = 1
-            pageClass = SettingGroupMain::class.java
-            parentClass = item6
             childClass = SettingGroupPersonalInfo::class.java
-
-            onClick = { CategorySettingsScreen("红包与支付").show(it) }
+            onClick = { openSettingsDialog(it) }
         }
+
+//        val item2 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest2"
+//            title = "测试 - WeKit 设置"
+//            level = 1
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item1
+//            onClick = { openSettingsDialog(it) }
+//        }
+//
+//        val item3 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest3"
+//            title = "测试 2 - WeKit 设置 - 详细日志"
+//            level = 1
+//            isSwitch = true
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item2
+//
+//            switchState = { Preferences.verboseLog }
+//            onSwitchChanged = { Preferences.verboseLog = it }
+//        }
+//
+//        // --- doesn't work ---
+//        val group = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKit"
+//            title = "测试 3 - WeKit 设置 - 原生"
+////            groupTitle = "测试"
+//            level = 1
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item3
+//
+//            onClick = {
+//                val subPageIntent = Intent {
+//                    putExtra("key_config_item", "SettingGroup_Main_WeKit")
+//                    putExtra("page_name_kv", "SettingGroup_Main_WeKit")
+//                    putExtra("ui_version", 2)
+//                    putExtra("setting_from_source", it.intent.getIntExtra("setting_from_source", 2))
+//                    putExtra("setting_level", 2)
+//                    putExtra("setting_page_time", System.currentTimeMillis().toString())
+//                    putStringArrayListExtra("key_intent_action_uic_list", arrayListOf(classIntentAction.clazz.name))
+////                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+//                }
+//
+//                methodPluginHelperLaunchIntent.method.invoke(null,
+//                    it, "setting", ".ui.setting_new.CommonSettingsUI", subPageIntent, true, null)
+//            }
+//        }
+//
+////        val newPagePageClass = SettingGroupMain::class.java
+//        val newPagePageClass = group
+//
+//        val newPageItem1 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKit_Test1"
+//            title = "聊天"
+//            groupTitle = "功能"
+//            level = 2
+//            pageClass = newPagePageClass
+//            parentClass = null
+//
+//            onClick = { CategorySettingsScreen("聊天").show(it) }
+//        }
+//
+//        val newPageItem2 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKit_Test2"
+//            title = "联系人与群组"
+//            level = 2
+//            pageClass = newPagePageClass
+//            parentClass = newPageItem1
+//
+//            onClick = { CategorySettingsScreen("联系人与群组").show(it) }
+//        }
+//
+//        val newPageItem3 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKit_Test3"
+//            title = "红包与支付"
+//            level = 2
+//            pageClass = newPagePageClass
+//            parentClass = newPageItem2
+//
+//            onClick = { CategorySettingsScreen("红包与支付").show(it) }
+//        }
+//        // --- end doesn't work ---
+//
+//        val item4 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest4"
+//            title = "聊天"
+//            groupTitle = "插件 - 功能"
+//            level = 1
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = group
+//
+//            onClick = { CategorySettingsScreen("聊天").show(it) }
+//        }
+//
+//        val item5 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest5"
+//            title = "聊天 - 阻止消息撤回 3"
+//            level = 1
+//            isSwitch = true
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item4
+//
+//            switchState = { WePrefs.getBoolOrFalse("阻止消息撤回 3") }
+//            onSwitchChanged = { WePrefs.putBool("阻止消息撤回 3", it) }
+//        }
+//
+//        val item6 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest6"
+//            title = "联系人与群组"
+//            level = 1
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item5
+//
+//            onClick = { CategorySettingsScreen("联系人与群组").show(it) }
+//        }
+//
+//        val item7 = settingsManager.createItem {
+//            key = "SettingGroup_Main_WeKitTest7"
+//            title = "红包与支付"
+//            level = 1
+//            pageClass = SettingGroupMain::class.java
+//            parentClass = item6
+//            childClass = SettingGroupPersonalInfo::class.java
+//
+//            onClick = { CategorySettingsScreen("红包与支付").show(it) }
+//        }
 
         settingsManager.install()
     }
@@ -526,7 +522,7 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex, WeHomeScreenPopupMenuApi
 
     override fun getMenuItems(param: XC_MethodHook.MethodHookParam) = listOf(
         WeHomeScreenPopupMenuApi.MenuItem(
-            0, "${BuildConfig.TAG} 设置", ExtensionIcon
+            0, BuildConfig.TAG, ExtensionIcon
         ) { openSettingsDialog(LauncherUI.getInstance()!!) }
     )
 

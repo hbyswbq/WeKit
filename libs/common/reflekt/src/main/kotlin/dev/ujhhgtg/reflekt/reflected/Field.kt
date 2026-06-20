@@ -29,7 +29,7 @@ open class ReflectedField<T>(override val self: Field) : BaseReflectedField(self
         return self.get(instance)
     }
 
-    fun get(): Any? {
+    fun getStatic(): Any? {
         self.makeAccessible()
         return self.get(null)
     }
@@ -39,7 +39,7 @@ open class ReflectedField<T>(override val self: Field) : BaseReflectedField(self
         self.set(instance, value)
     }
 
-    fun set(value: Any?) {
+    fun setStatic(value: Any?) {
         self.makeAccessible()
         self.set(null, value)
     }
@@ -55,7 +55,17 @@ class InstanceReflectedField<T : Any>(
         return self.get(instance)
     }
 
+    fun get(instance: T): Any? {
+        self.makeAccessible()
+        return self.get(instance)
+    }
+
     fun set(value: Any?) {
+        self.makeAccessible()
+        self.set(instance, value)
+    }
+
+    fun set(instance: T?, value: Any?) {
         self.makeAccessible()
         self.set(instance, value)
     }

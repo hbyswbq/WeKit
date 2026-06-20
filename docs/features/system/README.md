@@ -24,7 +24,7 @@
 - [修改运动步数](modify-sports-step-count.md) — 修改微信运动步数
 - [自动批准设备登录](auto-approve-device-login.md) — 自动勾选选项并确认多设备登录请求
 - [强制启用 WebView 菜单](enable-webview-features.md) — 强制显示 WebView 页面右上角菜单
-- [恢复旧版卡包界面](use-legacy-wallet-view.md) — 使用旧版「卡包」代替「小店与卡包」
+- [恢复旧版「我」界面卡包](use-legacy-wallet-view-in-me-page.md) — 使用旧版「卡包」代替「小店与卡包」
 - [链接跳转系统打开方式](link-external-app-jump.md) — 打开链接时弹窗选择系统应用打开
 - [二维码扫描记录](qr-code-record.md) — 记录扫描过的二维码 URL
 - [清理缓存垃圾](auto-clean-cache.md) — 自动或手动清理微信缓存, 每 30 分钟自动清理一次

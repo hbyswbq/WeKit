@@ -3,11 +3,13 @@ package dev.ujhhgtg.wekit.hooks.api.net
 import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
+import com.tencent.mm.network.v0
+import dev.ujhhgtg.comptime.nameOf
+import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.reflekt.utils.createInstance
+import dev.ujhhgtg.reflekt.utils.isBuiltin
 import dev.ujhhgtg.reflekt.utils.isSubclassOf
 import dev.ujhhgtg.reflekt.utils.toClass
-import de.robv.android.xposed.XposedHelpers
-import dev.ujhhgtg.comptime.nameOf
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
@@ -17,8 +19,6 @@ import dev.ujhhgtg.wekit.hooks.core.HookItem
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.reflection.ClassLoaders
 import dev.ujhhgtg.wekit.utils.reflection.bool
-import dev.ujhhgtg.reflekt.utils.isBuiltin
-import dev.ujhhgtg.reflekt.utils.makeAccessible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -417,11 +417,10 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
 
                 // 发送逻辑
                 if (nativeNetScene != null) {
-                    val netQueue = XposedHelpers.callStaticMethod(
-                        classMmKernel.clazz,
-                        methodGetNetQueue.method.name
-                    )
-                    val cgiType = XposedHelpers.callMethod(nativeNetScene, "getType") as Int
+                    val netQueue = classMmKernel.clazz.reflekt().invokeMethod(
+                        methodGetNetQueue.method.name, null
+                    )!!
+                    val cgiType = nativeNetScene.reflekt().invokeMethod("getType") as Int
 
                     val callbackProxy = Proxy.newProxyInstance(
                         cl,
@@ -439,9 +438,9 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
 
                         if (method.name == "onSceneEnd" && args != null) {
                             try {
-                                XposedHelpers.callMethod(netQueue, "q", cgiType, proxy)
+                                netQueue.reflekt().invokeMethod("q", cgiType, proxy)
                             } catch (e: Throwable) {
-                                WeLogger.w(TAG, "注销原生回调失败: ${e.message}")
+                                WeLogger.w(TAG, "failed to unregister native callback: ${e.message}")
                             }
 
                             NativeResponseHandler(callback, successAction).invoke(
@@ -455,10 +454,12 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
                     }
 
                     // 注册并入队
-                    XposedHelpers.callMethod(netQueue, "a", cgiType, callbackProxy)
-                    XposedHelpers.callMethod(netQueue, "g", nativeNetScene)
+                    netQueue.reflekt().apply {
+                        invokeMethod("a", cgiType, callbackProxy)
+                        invokeMethod("g", nativeNetScene)
+                    }
 
-                    WeLogger.i(TAG, "[$cgiId] 原生模式：已注册监听并入队发送")
+                    WeLogger.i(TAG, "[$cgiId] native mode: successfully registered listener and added to queue")
                 } else {
                     // 通用发包模式
                     val bytes = ProtoJsonBuilder.makeBytes(jsonObj)
@@ -468,47 +469,45 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
                     val specificReqCls = cgiReqClassMap[cgiId]
 
                     if (specificReqCls != null) {
-                        finalReqObject = XposedHelpers.newInstance(specificReqCls)
-                        XposedHelpers.callMethod(finalReqObject, "parseFrom", bytes)
+                        finalReqObject = specificReqCls.createInstance()
+                        finalReqObject.reflekt().invokeMethod("parseFrom", bytes)
                         WeLogger.i(TAG, "[$cgiId] using specific class: ${specificReqCls.name}")
                     } else {
                         val rawCls = classRawReq.clazz
-                        finalReqObject = XposedHelpers.newInstance(rawCls, bytes)
+                        finalReqObject = rawCls.createInstance(bytes)
                         WeLogger.i(TAG, "[$cgiId] using generic class: ${rawCls.name}")
                     }
 
                     val builder = classConfigBuilder.clazz.createInstance()
 
-                    XposedHelpers.setObjectField(builder, "a", finalReqObject)
-                    XposedHelpers.setObjectField(
-                        builder,
-                        "b",
-                        XposedHelpers.newInstance(classGenericResp.clazz)
-                    )
-                    XposedHelpers.setObjectField(builder, "c", uri)
-                    XposedHelpers.setIntField(builder, "d", cgiId)
-                    XposedHelpers.setIntField(builder, "e", funcId)
-                    XposedHelpers.setIntField(builder, "f", routeId)
-                    XposedHelpers.setIntField(builder, "l", 1)
-                    XposedHelpers.setObjectField(builder, "n", bytes)
+                    builder.reflekt().apply {
+                        setField("a", finalReqObject)
+                        setField("b", classGenericResp.clazz.createInstance())
+                        setField("c", uri)
+                        setField("d", cgiId)
+                        setField("e", funcId)
+                        setField("f", routeId)
+                        setField("l", 1)
+                        setField("n", bytes)
+                    }
 
-                    val rr = XposedHelpers.callMethod(builder, "a")
+                    val rr = builder.reflekt().invokeMethod("a")
                     val cbProxy = Proxy.newProxyInstance(
                         cl,
                         arrayOf(classCallbackIface.clazz),
                         ResponseHandler(callback, successAction)
                     )
 
-                    val methodD = XposedHelpers.findMethodExact(
-                        classNetDispatcher.clazz,
-                        "d",
-                        classReqResp.clazz,
-                        classCallbackIface.clazz,
-                        bool
-                    )
-
                     WeLogger.i(TAG, "[$cgiId] sending cgi...")
-                    methodD.invoke(null, rr, cbProxy, false)
+
+                    classNetDispatcher.reflekt().firstMethod {
+                        name = "d"
+                        parameters(
+                            classReqResp.clazz,
+                            classCallbackIface.clazz,
+                            bool
+                        )
+                    }.invoke(null, rr, cbProxy, false)
                 }
 
             } catch (e: Throwable) {
@@ -541,30 +540,27 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
                         var json = "{}"
 
                         try {
-                            val loader = netScene.javaClass.classLoader
-                            val v0Class =
-                                XposedHelpers.findClass("com.tencent.mm.network.v0", loader)
-                            val rrField = netScene.javaClass.declaredFields.firstOrNull {
-                                it.type isSubclassOf v0Class
+                            val v0Class = v0::class.java
+                            val rrField = netScene.reflekt().firstFieldOrNull {
+                                type { it isSubclassOf v0Class }
                             }
 
                             val rrObj = if (rrField != null) {
-                                rrField.makeAccessible().get(netScene)
+                                rrField.get(netScene)
                             } else {
-                                XposedHelpers.getObjectField(netScene, "d")
+                                netScene.reflekt().getField("d")
                             }
 
                             if (rrObj != null) {
-                                val respWrapper = XposedHelpers.getObjectField(rrObj, "b")
-                                val protoObj = XposedHelpers.getObjectField(respWrapper, "a")
-                                bytes =
-                                    XposedHelpers.callMethod(protoObj, "toByteArray") as? ByteArray
+                                val respWrapper = rrObj.reflekt().getField("b")!!
+                                val protoObj = respWrapper.reflekt().getField("a")!!
+                                bytes = protoObj.reflekt().invokeMethod("toByteArray") as? ByteArray
                                 if (bytes != null) {
                                     json = WeProtoData.fromBytes(bytes).toJsonObject().toString()
                                 }
                             }
                         } catch (e: Throwable) {
-                            WeLogger.w("NativeResponseHandler", "提取回包 Bytes 失败: ${e.message}")
+                            WeLogger.w(nameOf(NativeResponseHandler::class), "failed to extract response bytes", e)
                         }
 
                         userCallback?.onSuccess(json, bytes)
@@ -591,14 +587,11 @@ object WePacketHelper : ApiHookItem(), IResolveDex {
                 Handler(Looper.getMainLooper()).post {
                     if (errType == 0 && errCode == 0) {
                         successAction?.invoke()
-                        val respWrapper = XposedHelpers.getObjectField(reqResp, "b")
-                        val yd = XposedHelpers.getObjectField(respWrapper, "a")
-                        val bytes = try {
-                            XposedHelpers.callMethod(yd, "initialProtobufBytes") as? ByteArray
-                        } catch (_: Throwable) {
-                            null
-                        }
-                            ?: XposedHelpers.callMethod(yd, "toByteArray") as? ByteArray
+                        val respWrapper = reqResp.reflekt().getField("b")!!
+                        val yd = respWrapper.reflekt().getField("a")!!
+                        val bytes = runCatching {
+                            yd.reflekt().invokeMethod("initialProtobufBytes") as? ByteArray
+                        }.getOrElse { yd.reflekt().invokeMethod("toByteArray") as? ByteArray }
                         val json =
                             if (bytes != null) WeProtoData.fromBytes(bytes)
                                 .toJsonObject()

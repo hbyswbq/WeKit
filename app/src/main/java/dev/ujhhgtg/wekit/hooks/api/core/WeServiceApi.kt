@@ -69,7 +69,7 @@ object WeServiceApi : ApiHookItem(), IResolveDex {
             .firstMethod {
                 modifiers { it.contains(Modifiers.STATIC) }
                 returnType = classImageInfoStorage.clazz
-            }.invoke()!!
+            }.invokeStatic()!!
     }
 
     fun getImageMd5FromMsgInfo(msgInfo: MessageInfo): String {
@@ -85,7 +85,7 @@ object WeServiceApi : ApiHookItem(), IResolveDex {
             .firstMethod {
                 modifiers { it.contains(Modifiers.STATIC) }
                 returnType = methodVideoPathFeatureServiceRestoreMp4Path.method.declaringClass
-            }.invoke()!!
+            }.invokeStatic()!!
     }
 
     fun getVideoMp4PathFromMsgInfo(msgInfo: MessageInfo): String {

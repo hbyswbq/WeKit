@@ -256,7 +256,7 @@ object StickersSync : ClickableHookItem(), IResolveDex {
                 modifiers { it.contains(Modifiers.STATIC) }
                 returnType = classEmojiStorageMgr.clazz
             }
-            .invoke()!!
+            .invokeStatic()!!
         emojiStorageMgr.reflekt()
             .firstMethod {
                 returnType = classEmojiInfoStorage.clazz

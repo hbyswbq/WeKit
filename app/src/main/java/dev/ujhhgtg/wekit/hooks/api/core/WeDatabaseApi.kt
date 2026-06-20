@@ -52,7 +52,7 @@ object WeDatabaseApi : ApiHookItem(), IResolveDex {
                 parameterCount = 0
                 returnType = classCoreStorage.clazz
             }
-            .invoke()!!
+            .invokeStatic()!!
     }
 
     val configStorage by lazy {

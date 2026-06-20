@@ -52,6 +52,12 @@ class Reflect<T>(private val clazz: Class<T>) {
 
     fun lastMethod(): ReflectedMethod<T> = lastMethod { }
 
+    fun invokeMethod(name: String, instance: T?, vararg args: Any?): Any? {
+        return firstMethod {
+            this.name = name
+        }.invokeStatic(*args)
+    }
+
     // ==================== Fields ====================
 
     fun firstField(config: FieldSpec.() -> Unit): ReflectedField<T> {
@@ -296,6 +302,12 @@ class InstanceReflect<T : Any>(private val instance: T) {
 
     fun lastMethod(): InstanceReflectedMethod<T> = lastMethod { }
 
+    fun invokeMethod(name: String, vararg args: Any?): Any? {
+        return firstMethod {
+            this.name = name
+        }.invoke(*args)
+    }
+
     // ==================== Fields ====================
 
     fun firstField(config: FieldSpec.() -> Unit): InstanceReflectedField<T> {
@@ -326,6 +338,18 @@ class InstanceReflect<T : Any>(private val instance: T) {
     }
 
     fun lastField(): InstanceReflectedField<T> = lastField { }
+
+    fun getField(name: String): Any? {
+        return firstField {
+            this.name = name
+        }.get()
+    }
+
+    fun setField(name: String, value: Any?): Any? {
+        return firstField {
+            this.name = name
+        }.set(value)
+    }
 
     // ==================== Constructors ====================
 

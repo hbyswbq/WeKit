@@ -1,14 +1,40 @@
 package dev.ujhhgtg.wekit.ui.content
 
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.composables.icons.materialsymbols.MaterialSymbols
@@ -17,8 +43,10 @@ import com.composables.icons.materialsymbols.outlined.Add_circle
 import com.composables.icons.materialsymbols.outlined.Block
 import com.composables.icons.materialsymbols.outlined.Bug_report
 import com.composables.icons.materialsymbols.outlined.Build_circle
+import com.composables.icons.materialsymbols.outlined.Call
 import com.composables.icons.materialsymbols.outlined.Camera
 import com.composables.icons.materialsymbols.outlined.Chat
+import com.composables.icons.materialsymbols.outlined.Close
 import com.composables.icons.materialsymbols.outlined.Comedy_mask
 import com.composables.icons.materialsymbols.outlined.Contact_page
 import com.composables.icons.materialsymbols.outlined.Contacts
@@ -35,6 +63,7 @@ import com.composables.icons.materialsymbols.outlined.Newspaper
 import com.composables.icons.materialsymbols.outlined.Notifications
 import com.composables.icons.materialsymbols.outlined.Package_2
 import com.composables.icons.materialsymbols.outlined.Payments
+import com.composables.icons.materialsymbols.outlined.Search
 import com.composables.icons.materialsymbols.outlined.Terminal
 import com.composables.icons.materialsymbols.outlined.Update
 import com.composables.icons.materialsymbols.outlined.Upload
@@ -46,6 +75,8 @@ import dev.ujhhgtg.wekit.activity.StandardActivity
 import dev.ujhhgtg.wekit.activity.TransparentActivity
 import dev.ujhhgtg.wekit.constants.PackageNames
 import dev.ujhhgtg.wekit.constants.Preferences
+import dev.ujhhgtg.wekit.hooks.core.ClickableHookItem
+import dev.ujhhgtg.wekit.hooks.core.SwitchHookItem
 import dev.ujhhgtg.wekit.hooks.items.debug.ResetDexCache
 import dev.ujhhgtg.wekit.hooks.items.easter_egg.AprilFools
 import dev.ujhhgtg.wekit.hooks.items.easter_egg.isAprilFools
@@ -91,6 +122,10 @@ import java.time.LocalDate
 class MainSettingsScreen : BasePrefsScreen(BuildConfig.TAG) {
 
     override fun initPreferences() {
+        addFakeSearchBar { context ->
+            showSearchDialog(context)
+        }
+
         if (LocalDate.now().isAprilFools) {
             addCategory("???")
             addPreference(
@@ -110,6 +145,7 @@ class MainSettingsScreen : BasePrefsScreen(BuildConfig.TAG) {
             "红包与支付" to MaterialSymbols.Outlined.Payments,
             "朋友圈" to MaterialSymbols.Outlined.Camera,
             "系统与隐私" to MaterialSymbols.Outlined.Wand_stars,
+            "音视频通话" to MaterialSymbols.Outlined.Call,
             "通知" to MaterialSymbols.Outlined.Notifications,
             "界面美化" to MaterialSymbols.Outlined.Imagesearch_roller,
             "公众号" to MaterialSymbols.Outlined.Newspaper,
@@ -411,6 +447,138 @@ class MainSettingsScreen : BasePrefsScreen(BuildConfig.TAG) {
             summary = "@ujhhgtg_wekit_announce",
             icon = TelegramIcon,
             onClick = { "https://t.me/ujhhgtg_wekit_announce".toUri().openInSystem(it, true) }
+        )
+    }
+}
+
+private fun showSearchDialog(context: Context) {
+    showComposeDialog(context) {
+        var searchQuery by remember { mutableStateOf("") }
+        val focusRequester = remember { FocusRequester() }
+
+        // Filter target switchable/clickable hook items
+        val searchableItems = remember {
+            dev.ujhhgtg.wekit.hooks.core.HookItemsProvider.ALL_HOOK_ITEMS.filterIsInstance<SwitchHookItem>()
+        }
+
+        val filteredItems = remember(searchQuery) {
+            if (searchQuery.isBlank()) emptyList()
+            else searchableItems.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        }
+
+        val switchStates = remember { mutableStateMapOf<String, Boolean>() }
+
+        AlertDialogContent(
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f),
+            title = {
+                CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyLarge) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        placeholder = { Text("输入功能名称...") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = MaterialSymbols.Outlined.Search,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = MaterialSymbols.Outlined.Close,
+                                        contentDescription = "Clear text"
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                }
+
+                // Automatically requests focus and opens software keyboard on launch
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
+                }
+            },
+            text = {
+                if (filteredItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isBlank()) "输入关键词即可实时过滤结果" else "未匹配到任何相关功能",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        filteredItems.forEach { item ->
+                            val configKey = item.name
+                            val checked = switchStates[configKey] ?: WePrefs.getBoolOrFalse(configKey)
+
+                            DisposableEffect(configKey) {
+                                item.setToggleCompletionCallback {
+                                    switchStates[configKey] = item.isEnabled
+                                }
+                                onDispose {}
+                            }
+
+                            when (item) {
+                                is ClickableHookItem -> {
+                                    HookClickableRow(
+                                        title = item.name,
+                                        summary = item.description,
+                                        showSwitch = !item.noSwitchWidget,
+                                        checked = checked,
+                                        onCheckedChange = { requested ->
+                                            if (item.onBeforeToggle(requested, context)) {
+                                                WePrefs.putBool(configKey, requested)
+                                                item.isEnabled = requested
+                                                switchStates[configKey] = requested
+                                            }
+                                        },
+                                        onClick = { context ->
+                                            item.onClick(context)
+                                        }
+                                    )
+                                }
+                                is SwitchHookItem -> {
+                                    HookSwitchRow(
+                                        title = item.name,
+                                        summary = item.description,
+                                        checked = checked,
+                                        onCheckedChange = { requested ->
+                                            if (item.onBeforeToggle(requested, context)) {
+                                                WePrefs.putBool(configKey, requested)
+                                                item.isEnabled = requested
+                                                switchStates[configKey] = requested
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) { Text("关闭") }
+            }
         )
     }
 }

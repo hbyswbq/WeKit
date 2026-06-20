@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -60,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Arrow_back
 import com.composables.icons.materialsymbols.outlined.Keyboard_arrow_right
+import com.composables.icons.materialsymbols.outlined.Search
 import com.composables.icons.materialsymbols.outlined.Settings
 import dev.ujhhgtg.wekit.activity.StandardActivity
 import dev.ujhhgtg.wekit.constants.Preferences
@@ -138,6 +140,11 @@ private sealed class PrefRow {
         val onBeforeToggle: (Context, Boolean) -> Boolean,
         val bindCompletionCallback: ((Boolean) -> Unit) -> Unit,
         val onClick: (Context) -> Unit,
+    ) : PrefRow()
+
+    data class FakeSearch(
+        override val rowKey: String,
+        val onClick: (Context) -> Unit
     ) : PrefRow()
 }
 
@@ -392,6 +399,10 @@ abstract class BasePrefsScreen(private val title: String) {
         rows += PrefRow.HookClickable(rk, key, title, summary, showSwitch, initialChecked, onBeforeToggle, bindCompletionCallback, onClick)
     }
 
+    protected fun addFakeSearchBar(onClick: (Context) -> Unit) {
+        rows += PrefRow.FakeSearch(nextKey("fake_search"), onClick)
+    }
+
     private fun nextKey(base: String) = "${base}_${rowCounter++}"
 }
 
@@ -552,6 +563,9 @@ private fun PreferenceCoreList(
                         )
                     }
                 }
+                is PrefRow.FakeSearch -> {
+                    FakeSearchBarRow(onClick = row.onClick)
+                }
             }
         }
     }
@@ -627,7 +641,7 @@ private fun SwitchRow(row: PrefRow.Switch, checked: Boolean, enabled: Boolean, o
 }
 
 @Composable
-private fun HookSwitchRow(title: String, summary: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+fun HookSwitchRow(title: String, summary: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -647,7 +661,7 @@ private fun HookSwitchRow(title: String, summary: String, checked: Boolean, onCh
 }
 
 @Composable
-private fun HookClickableRow(title: String, summary: String, showSwitch: Boolean, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onClick: (Context) -> Unit) {
+fun HookClickableRow(title: String, summary: String, showSwitch: Boolean, checked: Boolean, onCheckedChange: (Boolean) -> Unit, onClick: (Context) -> Unit) {
     val context = LocalContext.current
     Row(
         modifier = Modifier
@@ -767,4 +781,39 @@ private fun SelectDialog(row: PrefRow.Select, onSelect: (Int, String) -> Unit, o
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("取消") } }
     )
+}
+
+@Composable
+private fun FakeSearchBarRow(onClick: (Context) -> Unit) {
+    val context = LocalContext.current
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(),
+                onClick = { onClick(context) }
+            ),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = MaterialSymbols.Outlined.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = "搜索功能",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+        }
+    }
 }

@@ -34,7 +34,7 @@ object WeAlertDialogApi : ApiHookItem(), IResolveDex {
         classMmAlert.reflekt()
             .firstMethod {
                 parameters(Context::class, BString, BString, BString, BString, DialogInterface.OnClickListener::class, DialogInterface.OnClickListener::class)
-            }.invoke(
+            }.invokeStatic(
                 context, content, title ?: "", okText, cancelText,
                 DialogInterface.OnClickListener { di, _ -> onClickOk(di) },
                 DialogInterface.OnClickListener { di, _ -> onClickCancel(di) })

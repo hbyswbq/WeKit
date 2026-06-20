@@ -39,6 +39,7 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Check
 import com.composables.icons.materialsymbols.outlined.Close
 import dev.ujhhgtg.wekit.constants.PackageNames
+import dev.ujhhgtg.wekit.ui.utils.LocationOnIcon
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.BitmapPool
@@ -310,7 +311,7 @@ private class CustomOsmMarker(mapView: MapView) : Overlay() {
     }
 
     fun setDefaultIcon() {
-        mIcon = mMapViewRepository!!.getDefaultMarkerIcon()
+        mIcon = LocationOnIcon
         setAnchor(ANCHOR_CENTER, ANCHOR_BOTTOM)
     }
 
@@ -337,7 +338,7 @@ private class CustomOsmMarker(mapView: MapView) : Overlay() {
 
         pj.toPixels(mPosition, mPositionPixels)
 
-        val rotationOnScreen = (if (isFlat) -mBearing else -pj.orientation - mBearing)
+        val rotationOnScreen = if (isFlat) -mBearing else -pj.orientation - mBearing
         drawAt(canvas, mPositionPixels.x, mPositionPixels.y, rotationOnScreen)
     }
 

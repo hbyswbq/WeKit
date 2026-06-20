@@ -1,3 +1,5 @@
+@file:Suppress("NOTHING_TO_INLINE")
+
 package dev.ujhhgtg.wekit.utils
 
 import de.robv.android.xposed.XC_MethodHook
@@ -47,6 +49,14 @@ inline fun Executable.hookAfterDirectly(
     }
 )
 
+inline fun BaseReflectedMethod.hookDirectly(
+    hook: XC_MethodHook
+): XC_MethodHook.Unhook = self.hookDirectly(hook)
+
+inline fun Executable.hookDirectly(
+    hook: XC_MethodHook
+): XC_MethodHook.Unhook = XposedBridge.hookMethod(this, hook)
+
 @Suppress("NOTHING_TO_INLINE")
-inline fun XC_MethodHook.MethodHookParam.invokeOriginal(thisObject: Any? = null, args: Array<Any?>? = null): Any? =
+fun XC_MethodHook.MethodHookParam.invokeOriginal(thisObject: Any? = null, args: Array<Any?>? = null): Any? =
     XposedBridge.invokeOriginalMethod(method, thisObject ?: this.thisObject, args ?: this.args)

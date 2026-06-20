@@ -828,7 +828,7 @@ object WeMessageApi : ApiHookItem(), IResolveDex {
                     parameters(BString, BString)
                     returnType = BString
                 }
-                .invoke(toUser, "amr_") as String
+                .invokeStatic(toUser, "amr_") as String
             val mGetAmrFullPath = methodGetAmrFullPath.method
             val fullPath = if (mGetAmrFullPath.isStatic) {
                 mGetAmrFullPath.invoke(null, partialPath, true)
@@ -855,7 +855,7 @@ object WeMessageApi : ApiHookItem(), IResolveDex {
                 .firstMethod {
                     returnType = methodStartRecvAndSend.method.declaringClass
                     modifiers { it.contains(Modifiers.STATIC) }
-                }.invoke()!!
+                }.invokeStatic()!!
 
             methodStartRecvAndSend.method.invoke(null, service)
 

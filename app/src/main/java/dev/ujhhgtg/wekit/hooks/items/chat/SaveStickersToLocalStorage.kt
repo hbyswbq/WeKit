@@ -67,7 +67,7 @@ object SaveStickersToLocalStorage : SwitchHookItem(), IResolveDex,
                         modifiers { it.contains(Modifiers.STATIC) }
                         parameterCount = 0
                     }
-                    .invoke()!!
+                    .invokeStatic()!!
                 var bytes = emojiFileEncryptMgr.reflekt()
                     .firstMethod {
                         parameters("com.tencent.mm.api.IEmojiInfo")

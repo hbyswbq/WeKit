@@ -1,4 +1,6 @@
 package com.tencent.mm.ui.base.preference;
 
-public class MMPreference {
+import com.tencent.mm.ui.MMActivity;
+
+public class MMPreference extends MMActivity {
 }

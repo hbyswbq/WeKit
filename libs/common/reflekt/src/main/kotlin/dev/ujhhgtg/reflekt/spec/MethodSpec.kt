@@ -30,6 +30,10 @@ class MethodSpec : Spec() {
         hasRuntimeCondition = true
     }
 
+    fun parameters() {
+        parameters = emptyList<Class<*>>()
+    }
+
     fun parameters(vararg types: KClass<*>) {
         parameters = types.map { it.java }
     }

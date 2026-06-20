@@ -18,7 +18,7 @@ object WePacketManager {
             val data = WeProtoData.fromBytes(reqBytes)
             WeLogger.logChunkedI(
                 "WePacketInterceptor.Request",
-                "Request: $uri, CGI=$cgiId, LEN=${reqBytes.size}, Data=${data.toJsonObject()}, Stack=${WeLogger.getStackTraceString()}"
+                "Request: $uri, CGI=$cgiId, LEN=${reqBytes.size}, Data=${data.toJsonObject()}, Stack=${WeLogger.currentStackTrace}"
             )
         }
 

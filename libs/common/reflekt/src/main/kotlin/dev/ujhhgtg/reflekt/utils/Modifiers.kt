@@ -4,6 +4,7 @@ import java.lang.reflect.Member
 import java.lang.reflect.Modifier
 
 inline val Member.isPublic get() = Modifier.isPublic(modifiers)
+inline val Member.isFinal get() = Modifier.isFinal(modifiers)
 inline val Member.isPrivate get() = Modifier.isPrivate(modifiers)
 inline val Member.isStatic get() = Modifier.isStatic(modifiers)
 inline val Member.isAbstract get() = Modifier.isAbstract(modifiers)

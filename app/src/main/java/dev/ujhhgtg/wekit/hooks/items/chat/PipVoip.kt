@@ -12,7 +12,7 @@ import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.reflekt.reflekt
 import org.luckypray.dexkit.DexKitBridge
 
-@HookItem(name = "音视频聊天使用画中画", categories = ["聊天"], description = "让微信的音视频聊天使用原生的画中画模式而非悬浮窗 (没写完)")
+@HookItem(name = "音视频通话使用画中画", categories = ["聊天", "音视频通话"], description = "让微信的音视频通话使用原生的画中画模式而非悬浮窗 (没写完)")
 object PipVoip : SwitchHookItem(), IResolveDex {
 
     private val TAG = This.Class.simpleName

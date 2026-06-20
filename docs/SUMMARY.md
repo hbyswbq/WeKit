@@ -124,7 +124,7 @@
 * [阻止微信清理模块数据](features/system/prevent-module-data-deletion.md)
 * [禁止微信检测 Xposed](features/system/prevent-xposed-detection.md)
 * [环境伪装](features/system/spoof-environment.md)
-* [恢复旧版卡包界面](features/system/use-legacy-wallet-view.md)
+* [恢复旧版「我」界面卡包](features/system/use-legacy-wallet-view-in-me-page.md)
 
 ## 通知
 

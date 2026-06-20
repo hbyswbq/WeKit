@@ -90,7 +90,7 @@ object WeDatabaseListenerApi : ApiHookItem() {
 
         val argsInfo = formatArgs(args)
         val resultStr = if (result != null) ", result=$result" else ""
-        val stackStr = ", stack=${WeLogger.getStackTraceString()}"
+        val stackStr = ", stack=${WeLogger.currentStackTrace}"
 
         WeLogger.logChunkedD(TAG, "[$methodName] table=$table$resultStr, args=[$argsInfo]$stackStr")
     }
@@ -192,7 +192,7 @@ object WeDatabaseListenerApi : ApiHookItem() {
                         if (Preferences.verboseLog)
                             WeLogger.d(
                                 TAG,
-                                "[rawQuery] SQL modified: $sql -> $currentSql, stack=${WeLogger.getStackTraceString()}"
+                                "[rawQuery] SQL modified: $sql -> $currentSql, stack=${WeLogger.currentStackTrace}"
                             )
                     }
                 } catch (e: Throwable) {
@@ -227,7 +227,7 @@ object WeDatabaseListenerApi : ApiHookItem() {
                     if (Preferences.verboseLog)
                         WeLogger.d(
                             TAG,
-                            "[rawQueryWithFactory] SQL modified: $sql -> $currentSql, stack=${WeLogger.getStackTraceString()}"
+                            "[rawQueryWithFactory] SQL modified: $sql -> $currentSql, stack=${WeLogger.currentStackTrace}"
                         )
                 }
             } catch (e: Throwable) {

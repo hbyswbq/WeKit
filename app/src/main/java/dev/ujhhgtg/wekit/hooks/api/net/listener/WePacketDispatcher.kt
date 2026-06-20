@@ -4,8 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.os.postDelayed
 import com.tencent.kinda.framework.module.impl.WXPCommReqResp
-import de.robv.android.xposed.XposedHelpers
-import dev.ujhhgtg.comptime.nameOf
+import dev.ujhhgtg.comptime.This
 import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
@@ -15,17 +14,27 @@ import dev.ujhhgtg.wekit.hooks.core.ApiHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.reflection.ClassLoaders
-import org.luckypray.dexkit.DexKitBridge
 import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
 
 @HookItem(name = "数据包拦截与篡改服务", categories = ["API"], description = "响应数据包拦截与篡改")
 object WePacketDispatcher : ApiHookItem(), IResolveDex {
 
-    private val TAG = nameOf(WePacketDispatcher)
-    private val classOnGYNetEnd by dexClass()
+    private val TAG = This.Class.simpleName
 
-    // 缓存最近 10 条记录，避免因脚本引起的无限递归
+    private val classOnGYNetEnd by dexClass {
+        searchPackages("com.tencent.mm.network")
+        matcher {
+            methodCount(1)
+            methods {
+                add {
+                    name = "onGYNetEnd"
+                    paramCount = 6
+                }
+            }
+        }
+    }
+
     private val recentRequests = ConcurrentHashMap<String, Long>()
 
     override fun onEnable() {
@@ -39,17 +48,18 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                     val originalCallback = args[2] ?: return@hookBefore
 
                     // 有时 getUri 返回 null
-                    val uri = (XposedHelpers.callMethod(v0Var, "getUri") ?: "null") as String
-                    val cgiId = XposedHelpers.callMethod(v0Var, "getType") as Int
+                    val v0Ref = v0Var.reflekt()
+                    val uri = v0Ref.invokeMethod("getUri") as? String? ?: "null"
+                    val cgiId = v0Ref.invokeMethod("getType") as Int
                     try {
-                        val reqWrapper = XposedHelpers.callMethod(v0Var, "getReqObj")
-                        val reqPbObj = XposedHelpers.getObjectField(reqWrapper, "a") // m.a
-                        val reqBytes =
-                            XposedHelpers.callMethod(reqPbObj, "toByteArray") as ByteArray
+                        val reqWrapper = v0Ref.invokeMethod("getReqObj")!!
+                        val reqPbObj = reqWrapper.reflekt().getField("a")!!
+                        val reqBytes = reqPbObj.reflekt().invokeMethod("toByteArray")!! as ByteArray
 
                         // 构造唯一标识符
                         val key =
-                            "$cgiId|$uri|${reqWrapper?.javaClass?.name}|${reqPbObj?.javaClass?.name}|${reqBytes.contentToString()}"
+                            "$cgiId|$uri|${reqWrapper.javaClass.name}|${reqPbObj.javaClass.name}|${reqBytes.contentToString()}"
+
                         // 检查是否在缓存中且时间间隔小于500毫秒
                         val currentTime = System.currentTimeMillis()
                         val lastTime = recentRequests[key]
@@ -58,6 +68,7 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                             WeLogger.d(TAG, "request skipped (duplicate): $uri")
                             return@hookBefore
                         }
+
                         // 更新缓存
                         recentRequests[key] = currentTime
                         // 限制缓存大小为10条
@@ -70,8 +81,8 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                         }
 
                         WePacketManager.handleRequestTamper(uri, cgiId, reqBytes)?.let { tampered ->
-                            XposedHelpers.callMethod(reqPbObj, "parseFrom", tampered)
-                            WeLogger.i(TAG, "Request Tampered: $uri")
+                            reqPbObj.reflekt().invokeMethod("parseFrom", tampered)
+                            WeLogger.i(TAG, "tampered request: $uri")
                         }
                     } catch (_: Throwable) {
                     }
@@ -89,6 +100,7 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                             "onGYNetEnd" -> {
                                 try {
                                     val respV0 = args!![4] ?: v0Var
+                                    val respV0Ref = respV0.reflekt()
 
                                     // 处理 Kinda 框架的 WXPCommReqResp
                                     if (respV0 is WXPCommReqResp) {
@@ -99,14 +111,10 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                                                 cgiId,
                                                 originalRespBytes
                                             )?.let { tampered ->
-                                                XposedHelpers.callMethod(
-                                                    respV0,
-                                                    "setWXPRespData",
-                                                    tampered
-                                                )
+                                                respV0Ref.invokeMethod("setWXPRespData", tampered)
                                                 WeLogger.i(
                                                     TAG,
-                                                    "Response Tampered (WXP): $uri"
+                                                    "tampered response (WXP): $uri"
                                                 )
                                             }
                                         }
@@ -114,36 +122,32 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                                     // 处理标准混淆的 ICommReqResp 实现
                                     else {
                                         val respWrapper = try {
-                                            XposedHelpers.getObjectField(respV0, "b")
+                                            respV0Ref.getField("b")
                                         } catch (_: NoSuchFieldError) {
-                                            XposedHelpers.callMethod(respV0, "getRespObj")
+                                            respV0Ref.invokeMethod("getRespObj")
                                         }
 
                                         if (respWrapper != null) {
-                                            val respPbObj = try {
-                                                respWrapper.reflekt().firstField { name = "a" }.get()
-                                            } catch (_: NoSuchFieldException) {
-                                                null
-                                            }
+                                            val respPbObj = runCatching {
+                                                respWrapper.reflekt().getField("a")
+                                            }.getOrNull()
+
 
                                             if (respPbObj != null) {
+                                                val respPbObjRef = respPbObj.reflekt()
+
                                                 try {
-                                                    val originalRespBytes = respPbObj.reflekt()
-                                                        .firstMethod { name = "toByteArray" }
-                                                        .invoke() as ByteArray
+                                                    val originalRespBytes = respPbObjRef
+                                                        .invokeMethod("toByteArray")!! as ByteArray
                                                     WePacketManager.handleResponseTamper(
                                                         uri,
                                                         cgiId,
                                                         originalRespBytes
                                                     )?.let { tampered ->
-                                                        XposedHelpers.callMethod(
-                                                            respPbObj,
-                                                            "parseFrom",
-                                                            tampered
-                                                        )
+                                                        respPbObjRef.invokeMethod("parseFrom", tampered)
                                                         WeLogger.i(
                                                             TAG,
-                                                            "Response Tampered (PB): $uri"
+                                                            "tampered response (PB): $uri"
                                                         )
                                                     }
                                                 } catch (_: NoSuchElementException) {
@@ -165,22 +169,7 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                     }
                 }
             } catch (ex: IllegalStateException) {
-                WeLogger.w(TAG, "exception occurred during entry: dex not resolved yet", ex)
-            }
-        }
-    }
-
-    override fun resolveDex(dexKit: DexKitBridge) {
-        classOnGYNetEnd.find(dexKit, true) {
-            searchPackages("com.tencent.mm.network")
-            matcher {
-                methodCount(1)
-                methods {
-                    add {
-                        name = "onGYNetEnd"
-                        paramCount = 6
-                    }
-                }
+                WeLogger.w(TAG, "exception occurred during entry", ex)
             }
         }
     }

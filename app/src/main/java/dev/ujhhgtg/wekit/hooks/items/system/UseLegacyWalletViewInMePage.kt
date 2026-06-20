@@ -8,8 +8,8 @@ import dev.ujhhgtg.wekit.hooks.core.HookItem
 import dev.ujhhgtg.wekit.hooks.core.SwitchHookItem
 import org.luckypray.dexkit.DexKitBridge
 
-@HookItem(name = "恢复旧版卡包界面", categories = ["系统与隐私"], description = "使用旧版「卡包」而非「小店与卡包」")
-object UseLegacyWalletView : SwitchHookItem(), IResolveDex {
+@HookItem(name = "恢复旧版「我」界面卡包", categories = ["系统与隐私"], description = "在「我」界面使用旧版「卡包」而非「小店与卡包」")
+object UseLegacyWalletViewInMePage : SwitchHookItem(), IResolveDex {
 
     override fun onEnable() {
         methodGetOrderAndCardEntranceInfo.hookAfter {
@@ -30,21 +30,15 @@ object UseLegacyWalletView : SwitchHookItem(), IResolveDex {
         }
     }
 
-    private val methodGetOrderAndCardEntranceInfo by dexMethod()
-
-    private val methodMoreTabUIHandlePrefOnClick by dexMethod()
-
-    override fun resolveDex(dexKit: DexKitBridge) {
-        methodGetOrderAndCardEntranceInfo.find(dexKit) {
-            matcher {
-                usingEqStrings("MicroMsg.EcsOrderService", "getOrderAndCardEntranceInfo use finder logic")
-            }
+    private val methodGetOrderAndCardEntranceInfo by dexMethod {
+        matcher {
+            usingEqStrings("MicroMsg.EcsOrderService", "getOrderAndCardEntranceInfo use finder logic")
         }
+    }
 
-        methodMoreTabUIHandlePrefOnClick.find(dexKit) {
-            matcher {
-                usingEqStrings("MicroMsg.MoreTabUI", "account has not already!", "onPreferenceTreeClick")
-            }
+    private val methodMoreTabUIHandlePrefOnClick by dexMethod {
+        matcher {
+            usingEqStrings("MicroMsg.MoreTabUI", "account has not already!", "onPreferenceTreeClick")
         }
     }
 }

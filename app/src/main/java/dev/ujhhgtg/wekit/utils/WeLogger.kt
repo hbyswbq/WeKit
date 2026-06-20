@@ -8,7 +8,6 @@ import java.io.FileWriter
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.io.path.div
@@ -159,32 +158,14 @@ object WeLogger {
 
     // ========== Stack Trace ==========
 
-    fun getStackTraceString(): String {
-        val stackTrace = Thread.currentThread().stackTrace
-        val stackTraceMsg = StringBuilder().append("\n")
-        var startRecording = false
-
-        for (element in stackTrace) {
-            val className = element!!.className
-            if (className.contains("LSPHooker")) {
-                startRecording = true
-                continue
-            }
-            if (!startRecording) continue
-            if (className == Thread::class.java.name) continue
-
-            stackTraceMsg.append(
-                "  at %s.%s(%s:%d)\n".format(
-                    Locale.ROOT,
-                    element.className,
-                    element.methodName,
-                    element.fileName,
-                    element.lineNumber
-                )
-            )
+    val currentStackTrace: String
+        get() {
+            return Thread.currentThread().stackTrace
+                .drop(2) // drop getStackTrace + this function
+                .joinToString(separator = "\n") { element ->
+                    "at ${element.className}.${element.methodName}(${element.fileName}:${element.lineNumber})"
+                }
         }
-        return stackTraceMsg.toString()
-    }
 
     // ========== Chunked ==========
 

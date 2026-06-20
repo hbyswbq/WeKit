@@ -23,9 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.tencent.mm.api.IEmojiInfo
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
 import dev.ujhhgtg.comptime.This
+import dev.ujhhgtg.reflekt.reflekt
+import dev.ujhhgtg.reflekt.utils.Modifiers
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.hooks.core.HookItem
@@ -38,7 +40,7 @@ import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.showToast
 import dev.ujhhgtg.wekit.utils.invokeOriginal
-import dev.ujhhgtg.reflekt.utils.makeAccessible
+import dev.ujhhgtg.wekit.utils.reflection.int
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.query.enums.MatchType
 import kotlin.random.Random
@@ -100,41 +102,25 @@ object EmojiGameControl : SwitchHookItem(), IResolveDex {
         methodPanelClick.hookBefore {
             val obj = args[3] ?: return@hookBefore
 
-            val fields = obj.javaClass.declaredFields
-            var infoType = -1
-            for (field in fields) {
-                if (field.type == Int::class.javaPrimitiveType && java.lang.reflect.Modifier.isFinal(
-                        field.modifiers
-                    )
-                ) {
-                    infoType = field.makeAccessible().getInt(obj)
-                    break
-                }
-            }
+            val infoType = obj.reflekt().firstField {
+                type = int
+                modifiers { it.contains(Modifiers.FINAL) }
+            }.get() as Int
 
-            if (infoType == 0) {
-                val emojiInfoField =
-                    fields.firstOrNull { it.type.name.contains("IEmojiInfo") }
+            if (infoType != 0) return@hookBefore
 
-                if (emojiInfoField != null) {
-                    emojiInfoField.makeAccessible()
-                    val emojiInfo = emojiInfoField.get(obj)
+            val emojiInfo = obj.reflekt().firstField {
+                type = IEmojiInfo::class
+            }.get() as? IEmojiInfo?
 
-                    if (emojiInfo != null) {
-                        val getMd5Method = XposedHelpers.findMethodExact(
-                            emojiInfo.javaClass,
-                            "getMd5",
-                            *arrayOf<Any>()
-                        )
-                        val emojiMd5 = getMd5Method.invoke(emojiInfo) as? String
+            if (emojiInfo != null) {
+                val emojiMd5 = emojiInfo.md5
 
-                        val activity = ((args[0] as View).context as ContextThemeWrapper).baseContext as Activity
+                val activity = ((args[0] as View).context as ContextThemeWrapper).baseContext as Activity
 
-                        when (emojiMd5) {
-                            MD5_MORRA -> showSelectDialog(this, false, activity)
-                            MD5_DICE -> showSelectDialog(this, true, activity)
-                        }
-                    }
+                when (emojiMd5) {
+                    MD5_MORRA -> showSelectDialog(this, false, activity)
+                    MD5_DICE -> showSelectDialog(this, true, activity)
                 }
             }
         }
