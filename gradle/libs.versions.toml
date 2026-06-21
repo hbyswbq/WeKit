@@ -20,7 +20,6 @@ lombok = "1.18.46"
 google-protobuf = "4.35.1"
 ksp = "2.3.9"
 okhttp = "5.4.0"
-kavaref = "1.1.0"
 hidden-api-bypass = "6.1"
 runtime = "1.11.3"
 # noinspection GradleDependency
@@ -103,9 +102,6 @@ dexkit = { module = "org.luckypray:dexkit", version.ref = "dexkit" }
 dexlib2 = { module = "org.smali:dexlib2", version.ref = "dexlib2" }
 dexmaker = { module = "com.linkedin.dexmaker:dexmaker", version.ref = "dexmaker" }
 hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hidden-api-bypass" }
-kavaref-core = { module = "com.highcapable.kavaref:kavaref-core", version.ref = "kavaref" }
-kavaref-extension = { module = "com.highcapable.kavaref:kavaref-extension", version.ref = "kavaref" }
-kavaref-android = { module = "com.highcapable.kavaref:kavaref-android", version.ref = "kavaref" }
 libsu-core = { module = "com.github.topjohnwu.libsu:core", version.ref = "libsu" }
 libxposed-service = { module = "io.github.libxposed:service", version.ref = "libxposed" }
 

@@ -486,8 +486,7 @@ object HideContacts : ClickableHookItem(), IResolveDex {
 
         methodVoipPlaySound.find(dexKit) {
             matcher {
-                usingEqStrings("MicroMsg.RingPlayer", "playend")
-                name = "run"
+                usingEqStrings("MicroMsg.RingPlayer", "playSound, type: %s, changeStreamType: %s, shake: %s")
             }
         }
 

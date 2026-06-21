@@ -14,7 +14,6 @@ import com.tencent.mm.plugin.setting.ui.setting_new.settings.SettingGroupMain
 import com.tencent.mm.plugin.setting.ui.setting_new.settings.SettingGroupPersonalInfo
 import com.tencent.mm.ui.LauncherUI
 import com.tencent.mm.ui.base.preference.IconPreference
-import de.robv.android.xposed.XC_MethodHook
 import dev.ujhhgtg.comptime.This
 import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.reflekt.utils.isBuiltin
@@ -28,7 +27,6 @@ import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.hooks.core.ApiHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
 import dev.ujhhgtg.wekit.ui.content.MainSettingsScreen
-import dev.ujhhgtg.wekit.ui.utils.ExtensionIcon
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.reflection.bool
 import dev.ujhhgtg.wekit.utils.reflection.int
@@ -78,9 +76,13 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex {
             }
 
             addMethod {
+                returnType = "int"
+                usingNumbers(1)
+            }
+
+            addMethod {
                 name = "<init>"
                 paramTypes("androidx.appcompat.app.AppCompatActivity")
-                usingNumbers(1)
             }
 
             superClass {
