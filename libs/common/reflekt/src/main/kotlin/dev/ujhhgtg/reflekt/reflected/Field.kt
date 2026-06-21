@@ -69,4 +69,12 @@ class InstanceReflectedField<T : Any>(
         self.makeAccessible()
         self.set(instance, value)
     }
+
+    fun erase(): ReflectedField<T> {
+        return ReflectedField(self)
+    }
+
+    fun of(instance: T): InstanceReflectedField<T> {
+        return InstanceReflectedField(instance, self)
+    }
 }

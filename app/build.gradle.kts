@@ -106,7 +106,7 @@ android {
         }
 
         release {
-            optimization.enable = false
+            optimization.enable = true
             signingConfig = signingConfigs.getByName(if (foundKeystore) "release" else "debug")
         }
     }

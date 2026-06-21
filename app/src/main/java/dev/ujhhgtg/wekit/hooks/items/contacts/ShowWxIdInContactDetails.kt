@@ -19,7 +19,7 @@ object ShowWxIdInContactDetails : SwitchHookItem(), IContactInfoProvider {
         val wxId = activity.currentWxId
 
         return listOf(ContactInfoItem(
-            key = "display_wxid",
+            key = PREF_KEY,
             title = "微信 ID: ${wxId ?: "获取失败"}",
             position = 1
         ))

@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -66,6 +65,7 @@ import dev.ujhhgtg.wekit.ui.utils.GitHubIcon
 import dev.ujhhgtg.wekit.ui.utils.TelegramIcon
 import dev.ujhhgtg.wekit.utils.BshSnapshotDecompiler
 import dev.ujhhgtg.wekit.utils.HostInfo
+import dev.ujhhgtg.wekit.utils.android.Intent
 import dev.ujhhgtg.wekit.utils.android.androidUserId
 import dev.ujhhgtg.wekit.utils.android.getEnabled
 import dev.ujhhgtg.wekit.utils.android.setEnabled
@@ -76,6 +76,16 @@ import dev.ujhhgtg.wekit.utils.openInSystem
 
 
 class MainActivity : ComponentActivity() {
+
+    private var isLaunchingWeChat = false
+
+    override fun onStop() {
+        super.onStop()
+        if (isLaunchingWeChat) {
+            isLaunchingWeChat = false
+            finishAndRemoveTask()
+        }
+    }
 
     private var pendingDecompileResult: String? = null
 
@@ -139,508 +149,507 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
 
-private data class ActivationState(
-    val isActivated: Boolean,
-    val title: String,
-    val desc: String,
-    val color: Color
-)
-
-@Composable
-private fun AppContent(resultLauncher: ActivityResultLauncher<String>, onUrlClick: (String) -> Unit) {
-    val context = LocalActivity.current!!
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    var showMenu by remember { mutableStateOf(false) }
-    var showAboutDialog by remember { mutableStateOf(false) }
-    var showConfirmDeleteTinkerDialog by remember { mutableStateOf(false) }
-    var showConfirmDeleteModuleDataDialog by remember { mutableStateOf(false) }
-    var showNoRootDialog by remember { mutableStateOf(false) }
-
-    var isLauncherIconEnabled by remember {
-        mutableStateOf(
-            ComponentName(
-                context,
-                "${PackageNames.THIS}.activity.MainActivityAlias"
-            ).getEnabled(context)
-        )
-    }
-
-    val isHookEnabledByLegacyApi = remember { HookStatus.isModuleEnabled || HostInfo.isHost }
+    private data class ActivationState(
+        val isActivated: Boolean,
+        val title: String,
+        val desc: String,
+        val color: Color
+    )
 
     @Composable
-    fun rememberActivationState(): ActivationState {
-        val hostAppPackages = remember { setOf(PackageNames.WECHAT) }
-        val xposedService by HookStatus.xposedService.collectAsState()
-        val isHookEnabledByLibXposedApi = remember(xposedService) {
-            xposedService?.let {
-                hostAppPackages.intersect(it.scope.toSet()).isNotEmpty()
-            } ?: false
-        }
+    private fun AppContent(resultLauncher: ActivityResultLauncher<String>, onUrlClick: (String) -> Unit) {
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-        val isHookEnabled = isHookEnabledByLegacyApi || isHookEnabledByLibXposedApi
+        var showMenu by remember { mutableStateOf(false) }
+        var showAboutDialog by remember { mutableStateOf(false) }
+        var showConfirmDeleteTinkerDialog by remember { mutableStateOf(false) }
+        var showConfirmDeleteModuleDataDialog by remember { mutableStateOf(false) }
+        var showNoRootDialog by remember { mutableStateOf(false) }
 
-        return remember(
-            isHookEnabled,
-            isHookEnabledByLibXposedApi,
-            xposedService
-        ) {
-            ActivationState(
-                isActivated = isHookEnabled,
-                title = if (isHookEnabled) "已激活" else "未激活",
-                desc = if (HostInfo.isHost) {
-                    HostInfo.packageName
-                } else {
-                    if (isHookEnabledByLibXposedApi) {
-                        "${xposedService?.frameworkName} ${xposedService?.frameworkVersion} " +
-                                "(${xposedService?.frameworkVersionCode}), API ${xposedService?.apiVersion}"
-                    } else {
-                        HookStatus.hookProviderNameForLegacyApi
-                    }
-                },
-                color = if (isHookEnabled) Color(0xFF4CAF50) else Color(0xFFF44336)
+        var isLauncherIconEnabled by remember {
+            mutableStateOf(
+                ComponentName(
+                    this,
+                    "${PackageNames.THIS}.activity.MainActivityAlias"
+                ).getEnabled(this)
             )
         }
-    }
 
-    val activationState = rememberActivationState()
+        val isHookEnabledByLegacyApi = remember { HookStatus.isModuleEnabled || HostInfo.isHost }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = BuildConfig.TAG,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                        .copy(alpha = 0.9f)
-                ),
-                actions = {
-                    IconButton(onClick = { showMenu = !showMenu }) {
-                        Icon(MaterialSymbols.OutlinedFilled.More_vert, contentDescription = "Menu")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("清除模块数据") },
-                            onClick = {
-                                showMenu = false
-                                showConfirmDeleteModuleDataDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("修复模块加载") },
-                            onClick = {
-                                showMenu = false
-                                showConfirmDeleteTinkerDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("反编译 BeanShell 快照") },
-                            onClick = {
-                                showMenu = false
-                                resultLauncher.launch("*/*")
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(if (isLauncherIconEnabled) "隐藏桌面图标" else "显示桌面图标") },
-                            onClick = {
-                                showMenu = false
-                                val componentName = ComponentName(
-                                    context,
-                                    "${PackageNames.THIS}.activity.MainActivityAlias"
-                                )
-                                val newState = !isLauncherIconEnabled
-                                componentName.setEnabled(context, newState)
-                                isLauncherIconEnabled = newState
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("关于") },
-                            onClick = {
-                                showMenu = false
-                                showAboutDialog = true
-                            }
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .padding(top = 16.dp)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = activationState.color),
-                modifier = Modifier.fillMaxWidth()
+        @Composable
+        fun rememberActivationState(): ActivationState {
+            val hostAppPackages = remember { setOf(PackageNames.WECHAT) }
+            val xposedService by HookStatus.xposedService.collectAsState()
+            val isHookEnabledByLibXposedApi = remember(xposedService) {
+                xposedService?.let {
+                    hostAppPackages.intersect(it.scope.toSet()).isNotEmpty()
+                } ?: false
+            }
+
+            val isHookEnabled = isHookEnabledByLegacyApi || isHookEnabledByLibXposedApi
+
+            return remember(
+                isHookEnabled,
+                isHookEnabledByLibXposedApi,
+                xposedService
             ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                ActivationState(
+                    isActivated = isHookEnabled,
+                    title = if (isHookEnabled) "已激活" else "未激活",
+                    desc = if (HostInfo.isHost) {
+                        HostInfo.packageName
+                    } else {
+                        if (isHookEnabledByLibXposedApi) {
+                            "${xposedService?.frameworkName} ${xposedService?.frameworkVersion} " +
+                                    "(${xposedService?.frameworkVersionCode}), API ${xposedService?.apiVersion}"
+                        } else {
+                            HookStatus.hookProviderNameForLegacyApi
+                        }
+                    },
+                    color = if (isHookEnabled) Color(0xFF4CAF50) else Color(0xFFF44336)
+                )
+            }
+        }
+
+        val activationState = rememberActivationState()
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = BuildConfig.TAG,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                            .copy(alpha = 0.9f)
+                    ),
+                    actions = {
+                        IconButton(onClick = { showMenu = !showMenu }) {
+                            Icon(MaterialSymbols.OutlinedFilled.More_vert, contentDescription = "Menu")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("清除模块数据") },
+                                onClick = {
+                                    showMenu = false
+                                    showConfirmDeleteModuleDataDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("修复模块加载") },
+                                onClick = {
+                                    showMenu = false
+                                    showConfirmDeleteTinkerDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("反编译 BeanShell 快照") },
+                                onClick = {
+                                    showMenu = false
+                                    resultLauncher.launch("*/*")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(if (isLauncherIconEnabled) "隐藏桌面图标" else "显示桌面图标") },
+                                onClick = {
+                                    showMenu = false
+                                    val componentName = ComponentName(
+                                        this@MainActivity,
+                                        "${PackageNames.THIS}.activity.MainActivityAlias"
+                                    )
+                                    val newState = !isLauncherIconEnabled
+                                    componentName.setEnabled(this@MainActivity, newState)
+                                    isLauncherIconEnabled = newState
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("关于") },
+                                onClick = {
+                                    showMenu = false
+                                    showAboutDialog = true
+                                }
+                            )
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .padding(top = 16.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = activationState.color),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = if (activationState.isActivated) MaterialSymbols.OutlinedFilled.Check_circle else MaterialSymbols.OutlinedFilled.Warning,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = activationState.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (activationState.isActivated) MaterialSymbols.OutlinedFilled.Check_circle else MaterialSymbols.OutlinedFilled.Warning,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
-                        Text(
-                            text = activationState.desc,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = activationState.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White
+                            )
+                            Text(
+                                text = activationState.desc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                MaterialSymbols.OutlinedFilled.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text("构建信息", style = MaterialTheme.typography.titleMedium)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        InfoItem("构建 Git 哈希", BuildConfig.GIT_HASH)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        InfoItem(
+                            "构建时间",
+                            formatEpoch(BuildConfig.BUILD_TIMESTAMP, true)
                         )
                     }
                 }
-            }
 
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                ElevatedCard(
+                    onClick = {
+                        if (!(Shell.isAppGrantedRoot() ?: false)) {
+                            showNoRootDialog = true
+                        } else {
+                            val userId = androidUserId
+                            Shell.cmd(
+                                "am force-stop --user $userId ${PackageNames.WECHAT}",
+                                "am start --user $userId -n ${PackageNames.WECHAT}/${PackageNames.WECHAT}.ui.LauncherUI"
+                            ).submit {
+                                finishAndRemoveTask()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            MaterialSymbols.OutlinedFilled.Info,
+                            imageVector = MaterialSymbols.Outlined.Open_in_new,
                             contentDescription = null,
+                            modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(16.dp))
-                        Text("构建信息", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    InfoItem("构建 Git 哈希", BuildConfig.GIT_HASH)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    InfoItem(
-                        "构建时间",
-                        formatEpoch(BuildConfig.BUILD_TIMESTAMP, true)
-                    )
-                }
-            }
-
-            ElevatedCard(
-                onClick = {
-                    if (!(Shell.isAppGrantedRoot() ?: false)) {
-                        showNoRootDialog = true
-                    } else {
-                        val userId = context.androidUserId
-                        Shell.cmd(
-                            "am force-stop --user $userId ${PackageNames.WECHAT}",
-                            "am start --user $userId -n ${PackageNames.WECHAT}/${PackageNames.WECHAT}.ui.LauncherUI"
-                        ).submit {
-                            context.finishAndRemoveTask()
+                        Column {
+                            Text(
+                                text = "打开微信",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "一键强制停止并启动微信",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Open_in_new,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "打开微信",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "一键强制停止并启动微信",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            ElevatedCard(
-                onClick = {
-                    context.startActivity(Intent().apply {
-                        setClassName(PackageNames.WECHAT, "${PackageNames.WECHAT}.ui.LauncherUI")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        putExtra(BuildConfig.TAG, "1")
-                    })
-                    context.finishAndRemoveTask()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "打开模块设置",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "打开微信内的模块设置",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            ElevatedCard(
-                onClick = {
-                    context.startActivity(Intent().apply {
-                        setClassName(PackageNames.WECHAT, "${PackageNames.WECHAT}.ui.LauncherUI")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        putExtra(BuildConfig.TAG, "2")
-                    })
-                    context.finishAndRemoveTask()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "打开模块设置 (强制非全屏 UI)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "如果一打开模块设置就闪退那就用这个",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            if (showConfirmDeleteTinkerDialog) {
-                val paths = remember {
-                    @Suppress("SdCardPath")
-                    listOf(
-                        "/data/data/${PackageNames.WECHAT}/tinker",
-                        "/data/data/${PackageNames.WECHAT}/tinker_server",
-                        "/data/data/${PackageNames.WECHAT}/tinker_temp"
-                    )
                 }
 
-                AlertDialog(
-                    onDismissRequest = { showConfirmDeleteTinkerDialog = false },
-                    title = { Text("修复模块加载") },
-                    text = {
-                        Text(
-                            "本操作将尝试修复微信热更新导致的模块不加载, 执行后请重启微信\n将删除以下路径的文件, 请确认无误后再删除!\n${
-                                paths.joinToString("\n") { "- $it" }
-                            }"
-                        )
+                ElevatedCard(
+                    onClick = {
+                        startActivity(Intent {
+                            setClassName(PackageNames.WECHAT, "${PackageNames.WECHAT}.ui.LauncherUI")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra(BuildConfig.TAG, "1")
+                        })
+                        isLaunchingWeChat = true
                     },
-                    dismissButton = {
-                        TextButton(onClick = { showConfirmDeleteTinkerDialog = false }) { Text("取消") }
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "打开模块设置",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "打开微信内的模块设置",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                ElevatedCard(
+                    onClick = {
+                        startActivity(Intent {
+                            setClassName(PackageNames.WECHAT, "${PackageNames.WECHAT}.ui.LauncherUI")
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra(BuildConfig.TAG, "2")
+                        })
+                        isLaunchingWeChat = true
                     },
-                    confirmButton = {
-                        Button(onClick = {
-                            showConfirmDeleteTinkerDialog = false
-                            if (!(Shell.isAppGrantedRoot() ?: false)) {
-                                showNoRootDialog = true
-                            } else {
-                                // if using Shell.cmd or su -c without -mm, the view of /data/user/0 is restricted
-                                paths.forEach { path ->
-                                    ProcessBuilder("su", "-mm", "-c", "rm -rf $path")
-                                        .redirectErrorStream(true)
-                                        .start()
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "打开模块设置 (强制非全屏 UI)",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "如果一打开模块设置就闪退那就用这个",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                if (showConfirmDeleteTinkerDialog) {
+                    val paths = remember {
+                        @Suppress("SdCardPath")
+                        listOf(
+                            "/data/data/${PackageNames.WECHAT}/tinker",
+                            "/data/data/${PackageNames.WECHAT}/tinker_server",
+                            "/data/data/${PackageNames.WECHAT}/tinker_temp"
+                        )
+                    }
+
+                    AlertDialog(
+                        onDismissRequest = { showConfirmDeleteTinkerDialog = false },
+                        title = { Text("修复模块加载") },
+                        text = {
+                            Text(
+                                "本操作将尝试修复微信热更新导致的模块不加载, 执行后请重启微信\n将删除以下路径的文件, 请确认无误后再删除!\n${
+                                    paths.joinToString("\n") { "- $it" }
+                                }"
+                            )
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showConfirmDeleteTinkerDialog = false }) { Text("取消") }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showConfirmDeleteTinkerDialog = false
+                                if (!(Shell.isAppGrantedRoot() ?: false)) {
+                                    showNoRootDialog = true
+                                } else {
+                                    // if using Shell.cmd or su -c without -mm, the view of /data/user/0 is restricted
+                                    paths.forEach { path ->
+                                        ProcessBuilder("su", "-mm", "-c", "rm -rf $path")
+                                            .redirectErrorStream(true)
+                                            .start()
+                                    }
+                                    showToast(this@MainActivity, "删除成功!")
                                 }
-                                showToast(context, "删除成功!")
-                            }
-                        }) { Text("确定") }
-                    })
-            }
-
-            if (showConfirmDeleteModuleDataDialog) {
-                val paths = remember {
-                    @Suppress("SdCardPath")
-                    listOf(
-                        "/data/data/${PackageNames.WECHAT}/files/mmkv/wekit_prefs",
-                        "/data/data/${PackageNames.WECHAT}/files/mmkv/wekit_prefs.crc",
-                    )
+                            }) { Text("确定") }
+                        })
                 }
 
-                AlertDialog(
-                    onDismissRequest = { showConfirmDeleteModuleDataDialog = false },
-                    title = { Text("清除模块数据") },
-                    text = {
-                        Text(
-                            "本操作将删除模块的功能配置, 用于解决部分功能导致微信无限闪退, 删除后请重启微信\n此操作*不会*重新执行 DEX 解析\n将删除以下路径的文件, 请确认无误后再删除!\n${
-                                paths.joinToString("\n") { "- $it" }
-                            }"
+                if (showConfirmDeleteModuleDataDialog) {
+                    val paths = remember {
+                        @Suppress("SdCardPath")
+                        listOf(
+                            "/data/data/${PackageNames.WECHAT}/files/mmkv/wekit_prefs",
+                            "/data/data/${PackageNames.WECHAT}/files/mmkv/wekit_prefs.crc",
                         )
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showConfirmDeleteModuleDataDialog = false }) { Text("取消") }
-                    },
-                    confirmButton = {
-                        Button(onClick = {
-                            showConfirmDeleteModuleDataDialog = false
-                            if (!(Shell.isAppGrantedRoot() ?: false)) {
-                                showNoRootDialog = true
-                            } else {
-                                // if using Shell.cmd or su -c without -mm, the view of /data/user/0 is restricted
-                                paths.forEach { path ->
-                                    ProcessBuilder("su", "-mm", "-c", "rm -rf $path")
-                                        .redirectErrorStream(true)
-                                        .start()
+                    }
+
+                    AlertDialog(
+                        onDismissRequest = { showConfirmDeleteModuleDataDialog = false },
+                        title = { Text("清除模块数据") },
+                        text = {
+                            Text(
+                                "本操作将删除模块的功能配置, 用于解决部分功能导致微信无限闪退, 删除后请重启微信\n此操作*不会*重新执行 DEX 解析\n将删除以下路径的文件, 请确认无误后再删除!\n${
+                                    paths.joinToString("\n") { "- $it" }
+                                }"
+                            )
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showConfirmDeleteModuleDataDialog = false }) { Text("取消") }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                showConfirmDeleteModuleDataDialog = false
+                                if (!(Shell.isAppGrantedRoot() ?: false)) {
+                                    showNoRootDialog = true
+                                } else {
+                                    // if using Shell.cmd or su -c without -mm, the view of /data/user/0 is restricted
+                                    paths.forEach { path ->
+                                        ProcessBuilder("su", "-mm", "-c", "rm -rf $path")
+                                            .redirectErrorStream(true)
+                                            .start()
+                                    }
+                                    showToast(this@MainActivity, "删除成功!")
                                 }
-                                showToast(context, "删除成功!")
-                            }
-                        }) { Text("确定") }
-                    })
-            }
+                            }) { Text("确定") }
+                        })
+                }
 
-            if (showNoRootDialog) {
-                AlertDialog(
-                    onDismissRequest = { showNoRootDialog = false },
-                    title = { Text("未授予 Root 权限") },
-                    text = { Text("请授予 Root 权限以执行此操作") },
-                    confirmButton = {
-                        Button(onClick = {
-                            showNoRootDialog = false
-                        }) { Text("确定") }
-                    })
-            }
+                if (showNoRootDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showNoRootDialog = false },
+                        title = { Text("未授予 Root 权限") },
+                        text = { Text("请授予 Root 权限以执行此操作") },
+                        confirmButton = {
+                            Button(onClick = {
+                                showNoRootDialog = false
+                            }) { Text("确定") }
+                        })
+                }
 
-            HorizontalDivider(
-                modifier = Modifier
-                    .padding(vertical = 4.dp)
-                    .alpha(0.1f),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            LinkCard(
-                icon = GitHubIcon,
-                title = "GitHub",
-                subtitle = "Ujhhgtg/WeKit",
-                onClick = { onUrlClick("https://github.com/Ujhhgtg/WeKit") }
-            )
-            LinkCard(
-                icon = TelegramIcon,
-                title = "Telegram",
-                subtitle = "@ujhhgtg_wekit_announce",
-                onClick = { onUrlClick("https://t.me/ujhhgtg_wekit_announce") }
-            )
-        }
-
-        if (showAboutDialog) {
-            AlertDialog(
-                onDismissRequest = { showAboutDialog = false },
-                title = { Text(text = "关于") },
-                text = {
-                    Column {
-                        Text("${BuildConfig.TAG} 是一款基于 Xposed 框架的开源免费微信模块")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("版本: ${BuildConfig.VERSION_NAME}")
-                        Text("版本号: ${BuildConfig.VERSION_CODE}")
-                        Text("作者：Ujhhgtg@github, cwuom@github")
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showAboutDialog = false }) {
-                        Text("确定")
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoItem(label: String, value: String) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-}
-
-@Composable
-private fun LinkCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
-    ElevatedCard(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
+                HorizontalDivider(
+                    modifier = Modifier
+                        .padding(vertical = 4.dp)
+                        .alpha(0.1f),
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                LinkCard(
+                    icon = GitHubIcon,
+                    title = "GitHub",
+                    subtitle = "Ujhhgtg/WeKit",
+                    onClick = { onUrlClick("https://github.com/Ujhhgtg/WeKit") }
                 )
+                LinkCard(
+                    icon = TelegramIcon,
+                    title = "Telegram",
+                    subtitle = "@ujhhgtg_wekit_announce",
+                    onClick = { onUrlClick("https://t.me/ujhhgtg_wekit_announce") }
+                )
+            }
+
+            if (showAboutDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAboutDialog = false },
+                    title = { Text(text = "关于") },
+                    text = {
+                        Column {
+                            Text("${BuildConfig.TAG} 是一款基于 Xposed 框架的开源免费微信模块")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("版本: ${BuildConfig.VERSION_NAME}")
+                            Text("版本号: ${BuildConfig.VERSION_CODE}")
+                            Text("作者：Ujhhgtg@github, cwuom@github")
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showAboutDialog = false }) {
+                            Text("确定")
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun InfoItem(label: String, value: String) {
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    @Composable
+    private fun LinkCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+        ElevatedCard(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

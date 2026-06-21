@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import de.robv.android.xposed.XC_MethodHook
+import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.wekit.hooks.api.ui.WeChatMessageViewApi
 import dev.ujhhgtg.wekit.hooks.core.ClickableHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
@@ -23,7 +24,6 @@ import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.formatEpoch
-import dev.ujhhgtg.reflekt.reflekt
 import java.lang.reflect.Field
 
 
@@ -66,7 +66,7 @@ object DisplayMessageSendTime : ClickableHookItem(),
         // 1. Convert 16dp to pixels dynamically so it matches standard screen-edge spacing
         val edgeMarginPx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
-            16f,
+            12f,
             context.resources.displayMetrics
         ).toInt()
 

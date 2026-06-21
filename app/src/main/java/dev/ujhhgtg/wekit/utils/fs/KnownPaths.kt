@@ -17,6 +17,10 @@ object KnownPaths {
             .createDirectoriesNoThrow()
     }
 
+    val codeCacheDir by lazy {
+        HostInfo.application.codeCacheDir.toPath()
+    }
+
     val moduleCache by lazy {
         (internalStorage / "Android" / "data" / HostInfo.packageName / "cache" / BuildConfig.TAG)
             .createDirectoriesNoThrow()

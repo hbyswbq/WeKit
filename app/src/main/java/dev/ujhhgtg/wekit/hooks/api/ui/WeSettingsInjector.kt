@@ -228,15 +228,15 @@ object WeSettingsInjector : ApiHookItem(), IResolveDex, WeHomeScreenPopupMenuApi
     }
 
     override fun onEnable() {
+        injectHomeScreenMenu()
+
+        hookLauncherUi()
+
         injectLegacy()
 
         // injectModernMethod1()
         injectModernMethod2()
         // injectModernMethod3()
-
-        injectHomeScreenMenu()
-
-        hookLauncherUi()
     }
 
     private fun injectLegacy() {

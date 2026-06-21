@@ -1,7 +1,6 @@
 package dev.ujhhgtg.wekit.hooks.items.payment
 
 import android.content.Context
-import android.widget.TextView
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.getValue
@@ -12,79 +11,62 @@ import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.hooks.core.ClickableHookItem
 import dev.ujhhgtg.wekit.hooks.core.HookItem
-import dev.ujhhgtg.wekit.preferences.WePrefs
+import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
-import dev.ujhhgtg.reflekt.reflekt
-import org.luckypray.dexkit.DexKitBridge
+import dev.ujhhgtg.wekit.utils.nul
+import dev.ujhhgtg.wekit.utils.reflection.BString
+import dev.ujhhgtg.wekit.utils.reflection.bool
 
 @HookItem(name = "修改显示余额", categories = ["红包与支付"], description = "伪装钱包余额文字")
 object ModifyWalletBalanceDisplay : ClickableHookItem(), IResolveDex {
 
     private const val KEY_BALANCE = "fake_wallet_balance"
 
-    private val methodUpdateBalanceDisplay by dexMethod()
-    private val methodTickerViewSetText by dexMethod()
-
-    override fun onEnable() {
-        methodUpdateBalanceDisplay.hookAfter {
-            val text = WePrefs.getStringOrDef(KEY_BALANCE, null) ?: return@hookAfter
-            val balanceView = thisObject.reflekt()
-                .firstField { type = TextView::class }
-                .get()!! as TextView
-            balanceView.text = text
-        }
-
-        methodTickerViewSetText.hookBefore {
-            args[0] = WePrefs.getStringOrDef(KEY_BALANCE, null) ?: return@hookBefore
+    private val methodWcPayMoneyLoadingViewSetMoneyCore by dexMethod {
+        matcher {
+            declaredClass = "com.tencent.mm.plugin.wallet_core.ui.view.WcPayMoneyLoadingView"
+            paramTypes(BString, bool, bool, bool)
+            addInvoke {
+                declaredClass = "com.tencent.mm.plugin.wallet_core.ui.view.WcPayMoneyLoadingView"
+                name = "setFirstMoney"
+            }
         }
     }
 
-    override fun resolveDex(dexKit: DexKitBridge) {
-        methodUpdateBalanceDisplay.find(dexKit) {
-            matcher {
-                declaredClass = "com.tencent.mm.plugin.mall.ui.MallIndexUIv2"
-                usingEqStrings("MicorMsg.MallIndexUIv2", "updateBalanceNum")
-            }
-        }
+    private var balance by prefOption(KEY_BALANCE, nul<String>())
 
-        methodTickerViewSetText.find(dexKit) {
-            matcher {
-                // TickerView is only used for displaying balance
-                declaredClass = "com.robinhood.ticker.TickerView"
-                usingEqStrings("Need to call #setCharacterLists first.")
-            }
+    override fun onEnable() {
+        methodWcPayMoneyLoadingViewSetMoneyCore.hookBefore {
+            val balance = balance ?: return@hookBefore
+            args[0] = balance
         }
     }
 
     override fun onClick(context: Context) {
         showComposeDialog(context) {
-            var input by remember {
-                mutableStateOf(
-                    WePrefs.getStringOrDef(KEY_BALANCE, null) ?: ""
-                )
-            }
+            var balanceInput by remember { mutableStateOf(balance ?: "") }
 
             AlertDialogContent(
                 title = { Text("修改显示余额") },
                 text = {
                     TextField(
-                        value = input,
-                        onValueChange = { input = it },
+                        value = balanceInput,
+                        onValueChange = { balanceInput = it },
                         label = { Text("零钱余额 (留空不修改)") })
                 },
                 confirmButton = {
                     Button(onClick = {
-                        if (!input.isBlank())
-                            WePrefs.putString(KEY_BALANCE, input)
+                        balance = if (!balanceInput.isBlank())
+                            balanceInput
                         else
-                            WePrefs.remove(KEY_BALANCE)
+                            null
                         onDismiss()
                     }) { Text("确定") }
                 },
-                dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+                dismissButton = { TextButton(onDismiss) { Text("取消") } }
             )
         }
     }

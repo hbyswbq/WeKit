@@ -98,7 +98,7 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                             "toString" -> return@newProxyInstance originalCallback.toString()
                             "equals" -> return@newProxyInstance originalCallback == args?.get(0)
                             "onGYNetEnd" -> {
-                                try {
+                                runCatching {
                                     val respV0 = args!![4] ?: v0Var
                                     val respV0Ref = respV0.reflekt()
 
@@ -121,11 +121,9 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                                     }
                                     // 处理标准混淆的 ICommReqResp 实现
                                     else {
-                                        val respWrapper = try {
+                                        val respWrapper = runCatching {
                                             respV0Ref.getField("b")
-                                        } catch (_: NoSuchFieldError) {
-                                            respV0Ref.invokeMethod("getRespObj")
-                                        }
+                                        }.getOrElse { respV0Ref.invokeMethod("getRespObj") }
 
                                         if (respWrapper != null) {
                                             val respPbObj = runCatching {
@@ -136,7 +134,7 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                                             if (respPbObj != null) {
                                                 val respPbObjRef = respPbObj.reflekt()
 
-                                                try {
+                                                runCatching {
                                                     val originalRespBytes = respPbObjRef
                                                         .invokeMethod("toByteArray")!! as ByteArray
                                                     WePacketManager.handleResponseTamper(
@@ -150,15 +148,11 @@ object WePacketDispatcher : ApiHookItem(), IResolveDex {
                                                             "tampered response (PB): $uri"
                                                         )
                                                     }
-                                                } catch (_: NoSuchElementException) {
-                                                } catch (_: NoSuchMethodException) {
                                                 }
                                             }
                                         }
                                     }
-                                } catch (t: Throwable) {
-                                    WeLogger.e(TAG, "failed to tamper inner logic", t)
-                                }
+                                }.onFailure { WeLogger.e(TAG, "failed to tamper inner logic", it) }
                             }
                         }
 

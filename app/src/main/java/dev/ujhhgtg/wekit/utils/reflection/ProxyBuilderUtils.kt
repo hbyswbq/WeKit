@@ -16,7 +16,7 @@ fun <T : Any> createProxyBuilder(
     interfaces: Array<Class<*>>,
 ): ProxyBuilder<T> {
     return ProxyBuilder.forClass(baseClass)
-        .dexCache((KnownPaths.moduleData / "generated_proxy_classes").createDirectoriesNoThrow().toFile())
+        .dexCache((KnownPaths.codeCacheDir / "generated_proxy_classes").createDirectoriesNoThrow().toFile())
         .parentClassLoader(classLoader)
         .constructorArgTypes(*constructorArgs)
         .implementing(*interfaces)

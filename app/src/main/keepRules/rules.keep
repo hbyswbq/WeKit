@@ -1,4 +1,5 @@
 # App
+-dontobfuscate
 -keepnames class * implements dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 
 # Attributes
