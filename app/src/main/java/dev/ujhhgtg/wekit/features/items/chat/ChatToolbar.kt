@@ -27,6 +27,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.toMutableStateList
@@ -75,6 +76,7 @@ import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.now
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.lang.ref.WeakReference
 import kotlin.time.Duration.Companion.seconds
 
 @SuppressLint("StaticFieldLeak")
@@ -123,8 +125,8 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
         val name: String,
         val onClickListener: AdapterView.OnItemClickListener,
         val onLongClickListener: AdapterView.OnItemLongClickListener,
-        val gridView: GridView,
-        val itemView: View,
+        val gridView: WeakReference<GridView>,
+        val itemView: WeakReference<View>,
         val indexInGrid: Int
     )
 
@@ -175,8 +177,8 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
                                 name,
                                 onClickListener,
                                 onLongClickListener,
-                                grid,
-                                itemView,
+                                WeakReference(grid),
+                                WeakReference(itemView),
                                 index
                             )
                         )
@@ -212,6 +214,12 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
 
                     setContent {
                         AppTheme {
+                            DisposableEffect(Unit) {
+                                onDispose {
+                                    toolsState.value = emptyList()
+                                }
+                            }
+
                             val tools by toolsState.collectAsStateWithLifecycle()
                             val itemsOrder = remember { itemsOrder }
                             val enabledItems = remember { enabledItems }
@@ -225,7 +233,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
 
                                 // 预置快捷项
                                 list.add("相册" to {
-                                    firstTool.onClickListener.onItemClick(firstTool.gridView, firstTool.itemView, 0, 0)
+                                    firstTool.onClickListener.onItemClick(firstTool.gridView.get()!!, firstTool.itemView.get()!!, 0, 0)
                                 })
                                 list.add("系统拍摄" to {
                                     firstTool.onLongClickListener.onItemLongClick(null, null, 0, 0)
@@ -234,10 +242,12 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
                                 // 遍历并装载动态项
                                 tools.forEach { (name, menuItem) ->
                                     if (name in NAME_TO_ICON_MAP && name != "相册" && name != "系统拍摄") {
+                                        val gridView = menuItem.gridView.get() ?: return@forEach
+                                        val itemView = menuItem.itemView.get() ?: return@forEach
                                         list.add(name to {
                                             menuItem.onClickListener.onItemClick(
-                                                menuItem.gridView,
-                                                menuItem.itemView,
+                                                gridView,
+                                                itemView,
                                                 menuItem.indexInGrid + 1,
                                                 0
                                             )
@@ -265,6 +275,10 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
                     }
                 }, 0)
             }
+    }
+
+    override fun onDisable() {
+        toolsState.value = emptyList()
     }
 
     override fun onClick(context: Context) {

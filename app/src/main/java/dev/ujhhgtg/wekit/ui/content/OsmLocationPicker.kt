@@ -44,8 +44,10 @@ import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.BitmapPool
 import org.osmdroid.tileprovider.tilesource.ITileSource
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.RectL
 import org.osmdroid.views.MapView
@@ -58,13 +60,50 @@ import kotlin.math.roundToInt
 
 
 /**
+ * A tile source that mirrors OSM tiles from within mainland China.
+ * Uses [osm.open.cn](https://osm.open.cn/) — a community CDN accessible behind the GFW.
+ * No API key required.
+ */
+val CHINA_OSM_TILE_SOURCE: ITileSource = XYTileSource(
+    "ChinaOSM", 0, 19, 256, ".png",
+    arrayOf("https://osm.open.cn/"),
+    "© OpenStreetMap contributors"
+)
+
+/**
+ * Creates a tile source backed by [天地图](http://lbs.tianditu.gov.cn/),
+ * China's official national geographic information service.
+ * Requires a free API key (register at the link above).
+ *
+ * Uses the vector base map in Web Mercator projection (EPSG:3857, `vec_w` layer).
+ */
+fun tiandituTileSource(apiKey: String): ITileSource = object : OnlineTileSourceBase(
+    "Tianditu", 0, 19, 256, "",
+    arrayOf(
+        "https://t0.tianditu.gov.cn/vec_w/wmts?" +
+            "SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0" +
+            "&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&tk=$apiKey"
+    ),
+    "© 天地图"
+) {
+    override fun getTileURLString(pMapTileIndex: Long): String =
+        baseUrl +
+            "&TILECOL=" + MapTileIndex.getX(pMapTileIndex) +
+            "&TILEROW=" + MapTileIndex.getY(pMapTileIndex) +
+            "&TILEMATRIX=" + MapTileIndex.getZoom(pMapTileIndex)
+}
+
+/**
  * A dialog wrapping an osmdroid [MapView] (OpenStreetMap, FOSS).
  * The user taps anywhere on the map to drop a pin; tapping Confirm fires
  * [onLocationSelected] with the chosen [GeoPoint].
  *
  * @param initialLocation    Camera target on open (defaults to Shanghai).
  * @param initialZoom        Initial zoom level (0–19, defaults to 12).
- * @param tileSource         Tile source to use; swap for a China-accessible CDN.
+ * @param tileSource         Tile source. Default is [CHINA_OSM_TILE_SOURCE],
+ *                           an OSM mirror hosted in mainland China (no API key).
+ *                           Pass [tiandituTileSource] with a Tianditu API key for
+ *                           an official China-government-backed tile source.
  * @param onLocationSelected Called with the confirmed [GeoPoint]; dismiss here.
  * @param onDismiss          Called when the user cancels.
  */
@@ -72,7 +111,7 @@ import kotlin.math.roundToInt
 fun OsmLocationPicker(
     initialLocation: GeoPoint = GeoPoint(31.224361, 121.469170), // Shanghai
     initialZoom: Double = 5.0,
-    tileSource: ITileSource = TileSourceFactory.MAPNIK,
+    tileSource: ITileSource = CHINA_OSM_TILE_SOURCE,
     onLocationSelected: (GeoPoint) -> Unit,
     onDismiss: () -> Unit,
 ) {

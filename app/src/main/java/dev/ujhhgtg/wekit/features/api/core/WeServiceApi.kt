@@ -80,7 +80,7 @@ object WeServiceApi : ApiFeature(), IResolveDex {
     }
     private val methodMmKernelGetServiceImpl by dexMethod()
     private val methodVideoPathFeatureServiceRestoreMp4Path by dexMethod() // formerly VideoInfoStorage
-    private val classVideoService by dexClass {
+    val classVideoService by dexClass {
         matcher {
             usingEqStrings("MicroMsg.VideoService", "MicroMsg.SubCoreVideo", "quitVideoSendThread")
         }

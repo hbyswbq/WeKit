@@ -345,6 +345,12 @@ object HideContacts : ClickableFeature(), IResolveDex {
         }
     }
 
+    override fun onDisable() {
+        runCatching { HostInfo.application.unregisterReceiver(ScreenOffReceiver) }
+        chattingUi = null
+        ShakeDetector.stop()
+    }
+
     private var pendingVoipUser: String? = null
 
     private const val SQL_SELECT_MESSAGE =

@@ -74,14 +74,14 @@ object WeChatMessageContextMenuApi : ApiFeature(), IResolveDex {
 //        }
 //    }
 
-    private lateinit var currentView: View
+    private var currentView: View? = null
 
     override fun onEnable() {
         methodCreateMenu.hookBefore {
             val menu = args[0]
 
             currentView = args[1] as View
-            val tag = currentView.tag
+            val tag = currentView!!.tag
 
             val msgInfo = WeMessageApi.getMsgInfoFromTag(tag)
 
@@ -120,7 +120,7 @@ object WeChatMessageContextMenuApi : ApiFeature(), IResolveDex {
                 }
                 .get()!!
 
-            val tag = currentView.tag
+            val tag = currentView!!.tag
             val msgInfo = WeMessageApi.getMsgInfoFromTag(tag)
 
             val menuItem = args[0] as android.view.MenuItem
@@ -129,7 +129,7 @@ object WeChatMessageContextMenuApi : ApiFeature(), IResolveDex {
                 for (item in menuItems.values.flatten()) {
                     if (item.id == menuItem.itemId) {
                         item.onClick(
-                            currentView,
+                            currentView!!,
                             ChattingContext(chattingContext),
                             msgInfoWrapper
                         )
@@ -145,5 +145,9 @@ object WeChatMessageContextMenuApi : ApiFeature(), IResolveDex {
                 )
             }
         }
+    }
+
+    override fun onDisable() {
+        currentView = null
     }
 }

@@ -71,7 +71,9 @@ object FingerprintPay : ClickableFeature() {
             WeLogger.i(TAG, "MyKeyboardWindow initialized, requesting biometric auth")
 
             val thiz = thisObject as MyKeyboardWindow
-            val digitViews = thiz.reflekt().fields { type = View::class }.map { it.get()!! as View }
+            val digitViews = MyKeyboardWindow::class.reflekt()
+                .fields { type = View::class }
+                .map { it.get(thisObject as MyKeyboardWindow)!! as View }
 
             val context = thiz.context
 

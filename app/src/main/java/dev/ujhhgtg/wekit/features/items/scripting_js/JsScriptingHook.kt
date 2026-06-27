@@ -29,7 +29,7 @@ object JsScriptingHook : SwitchFeature(),
     override fun onEnable() {
         WeDatabaseListenerApi.addListener(this)
 
-        WeLogger.d(TAG, "loading scripts...")
+        WeLogger.d(TAG, "loading js scripts...")
         for (path in SCRIPTS_DIR.listDirectoryEntries("*.js")) {
             val name = path.name
             val content = runCatching { path.readText() }.getOrElse { continue }

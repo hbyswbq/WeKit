@@ -4,6 +4,7 @@ public class WXMediaMessage {
 
     public IMediaObject mediaObject;
     public String title;
+    public String description;
 
     public interface IMediaObject {}
 }

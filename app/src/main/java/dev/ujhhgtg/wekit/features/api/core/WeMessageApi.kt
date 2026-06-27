@@ -12,11 +12,13 @@ import dev.ujhhgtg.reflekt.utils.createInstance
 import dev.ujhhgtg.reflekt.utils.isBuiltin
 import dev.ujhhgtg.reflekt.utils.isStatic
 import dev.ujhhgtg.reflekt.utils.makeAccessible
+import dev.ujhhgtg.reflekt.utils.toClass
 import dev.ujhhgtg.wekit.constants.WeChatVersions
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexConstructor
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
+import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.core.ApiFeature
 import dev.ujhhgtg.wekit.features.core.Feature
@@ -33,6 +35,7 @@ import dev.ujhhgtg.wekit.utils.serialization.XmlUtils.extractXmlAttr
 import dev.ujhhgtg.wekit.utils.serialization.XmlUtils.extractXmlTag
 import org.json.JSONObject
 import org.luckypray.dexkit.DexKitBridge
+import org.luckypray.dexkit.query.matchers.base.AccessFlagsMatcher
 import java.io.InputStream
 import java.io.OutputStream
 import java.lang.reflect.Constructor
@@ -88,19 +91,79 @@ object WeMessageApi : ApiFeature(), IResolveDex {
             }
         }
     }
+    // hi0.j1::d() is identical to xv0.a9::e()
     private val methodGetSendMsgObject by dexMethod(allowMultiple = true) {
         matcher {
             paramCount = 0
             returnType = classNetSceneObserverOwner.getDescriptorString() ?: ""
+            modifiers(AccessFlagsMatcher(Modifier.STATIC))
         }
     }
-    private val methodPostToQueue by dexMethod(allowMultiple = true) {
+    private val methodPostToQueue by dexMethod {
         searchPackages("com.tencent.mm.modelbase")
         matcher {
             declaredClass = classNetSceneQueue.getDescriptorString() ?: ""
             paramTypes(classNetSceneBase.getDescriptorString() ?: "")
             returnType = "boolean"
             usingNumbers(0)
+        }
+    }
+
+    // C1391: "PatMsgExtension.ClassPatMsgExtension" — used by sendPat
+    private val classPatMsgExtension by dexClass {
+        matcher {
+            usingEqStrings("MicroMsg.PatMsgExtension")
+        }
+    }
+
+    // C1353.f4831: NetSceneSendPat — C1350 case 6, ctor 4-param (Pair, String, String, Integer)
+    private val ctorNetSceneSendPat by dexConstructor {
+        matcher {
+            usingEqStrings("MicroMsg.NetSceneSendPat")
+            paramCount(4)
+        }
+    }
+
+    // C1350 case 1+2: C1351.f4829 NetSceneRevokeMsg — 3-param ctor: (f8 msgInfo, String, String)
+    private val ctorNetSceneRevokeMsg by dexConstructor {
+        searchPackages("com.tencent.mm.modelsimple")
+        matcher {
+            usingEqStrings("MicroMsg.NetSceneRevokeMsg")
+            paramCount(3)
+        }
+    }
+
+    // C0460 case 11: C1339.f4817 NetSceneSendMsg (location variant) — C2812.m4143("MicroMsg.NetSceneSendMsg", "/cgi-bin/micromsg-bin/newsendmsg")
+    private val ctorNetSceneSendMsgLocation by dexConstructor {
+        matcher {
+            usingEqStrings("MicroMsg.NetSceneSendMsg")
+            paramCount(5)
+        }
+    }
+
+    // C0760 case 2+4: C0662.f2775 ImportMultiVideo — 7-param ctor
+    private val ctorImportMultiVideo by dexConstructor {
+        searchPackages("com.tencent.mm.pluginsdk.model")
+        matcher {
+            usingEqStrings("MicroMsg.GetVideoMetadata")
+            paramCount(7)
+        }
+    }
+
+    // C2365: "AppMessage.ClassAppMessage" — card/share message class
+    private val classAppMessage by dexClass {
+        searchPackages("com.tencent.mm.pluginsdk.model.app")
+        matcher {
+            usingEqStrings("MicroMsg.AppMessage")
+        }
+    }
+
+    // C2367: "AppMsgLogic.MethodSendAppMsg" — static send method for AppMessage
+    private val methodSendAppMsg by dexMethod {
+        matcher {
+            usingEqStrings("MicroMsg.AppMsgLogic")
+            modifiers(9) // public static
+            paramCount(6)
         }
     }
     private val methodShareFile by dexMethod {
@@ -431,6 +494,148 @@ object WeMessageApi : ApiFeature(), IResolveDex {
             WeServiceApi.messageInfoStorage,
             msgInfo
         )
+    }
+
+    /**
+     * Revoke (unsend) a message by its msgSvrId.
+     * Uses WeChat's MsgInfoStorage revoke method found via DexKit.
+     */
+    fun revokeMsg(msgSvrId: Long): Boolean {
+        return try {
+            WeLogger.i(TAG, "revoking message: $msgSvrId")
+            val storage = WeServiceApi.messageInfoStorage
+            val getMsgMethod = storage.reflekt()
+                .firstMethod { parameters(Long::class.java) }
+                .self
+            val f8 = getMsgMethod.invoke(storage, msgSvrId)
+            val netScene = ctorNetSceneRevokeMsg.newInstance(f8, "你撤回了一条消息", "")
+            WeNetSceneApi.sendNetScene(netScene)
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "revokeMsg failed", e); false }
+    }
+
+    fun sendQuoteMsg(talker: String, msgSvrId: Long, content: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending quote message to $talker")
+            val storage = WeServiceApi.messageInfoStorage
+            val getMsgMethod = storage.reflekt()
+                .firstMethod { parameters(Long::class.java) }
+                .self
+            val f8 = getMsgMethod.invoke(storage, msgSvrId)!!
+            val mi = MessageInfo(f8)
+            val appmsg = JSONObject()
+            appmsg.put("type", 57)
+            appmsg.put("title", content)
+            val refermsg = JSONObject()
+            refermsg.put("type", mi.typeCode)
+            refermsg.put("svrid", msgSvrId)
+            refermsg.put("fromusr", mi.talker)
+            refermsg.put("chatusr", mi.talker)
+            refermsg.put("displayname", WeDatabaseApi.getDisplayName(mi.talker ?: ""))
+            refermsg.put("msgsource", "")
+            refermsg.put("content", content)
+            refermsg.put("strid", "")
+            refermsg.put("createtime", mi.createTime)
+            appmsg.put("refermsg", refermsg)
+            val outer = JSONObject()
+            outer.put("msg", JSONObject().put("appmsg", appmsg))
+            val appMsg = classAppMessage.clazz.createInstance(outer.toString())
+            methodSendAppMsg.method.invoke(null, appMsg, "", "", talker, "", null)
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendQuoteMsg failed", e); false }
+    }
+
+    fun sendEmoji(toUser: String, md5: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending emoji: $md5 to $toUser")
+            val emojiService = WeServiceApi.emojiFeatureService
+            val prepared = emojiService.reflekt()
+                .firstMethod { parameters(String::class); returnType = String::class }
+                .invoke(md5)
+            val emojiInfoClazz = "com.tencent.mm.storage.emotion.EmojiInfo".toClass()
+            val emojiInfo = emojiInfoClazz.reflekt()
+                .firstMethod { parameters(String::class); modifiers { it.contains(Modifier.STATIC) } }
+                .invokeStatic(prepared)
+            emojiService.reflekt()
+                .firstMethod { parameters(String::class, emojiInfoClazz) }
+                .invoke(toUser, emojiInfo)
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendEmoji failed", e); false }
+    }
+
+    fun sendPat(toUser: String, patTargetWxId: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending pat to $patTargetWxId in $toUser")
+            // Get PatMsgExtension service instance (C1387 ≈ C1104.m2574 → classPatMsgExtension)
+            val patService = WeServiceApi.getServiceByClass(classPatMsgExtension.clazz)
+            // First reflection: find method returning String with 2 String params → m1650(patTarget, talker)
+            val strMethod = patService.reflekt()
+                .firstMethod { parameters(String::class, String::class); returnType = String::class }
+                .self
+            val str11 = strMethod.invoke(patService, patTargetWxId, toUser) as String
+            // timestamp = (int)(System.currentTimeMillis() / 1000)
+            val timestamp = (System.currentTimeMillis() / 1000).toInt()
+            // Second reflection: find method returning Pair with 6 params → m1650(talker, selfWxId, patTarget, str11, timestamp, 0L)
+            val pairMethod = patService.reflekt()
+                .firstMethod {
+                    parameters(String::class, String::class, String::class, String::class, Int::class.java, Long::class.java)
+                    returnType = android.util.Pair::class.java
+                }
+                .self
+            val pair = pairMethod.invoke(patService, toUser, WeApi.selfWxId, patTargetWxId, str11, timestamp, 0L)
+            // Dispatch via background executor
+            val threadUtilsClazz = "com.tencent.threadpool.ThreadUtils".toClass()
+            threadUtilsClazz.reflekt()
+                .firstMethod { parameters(Runnable::class, String::class) }
+                .invokeStatic(Runnable {
+                    val netScene = ctorNetSceneSendPat.newInstance(pair, toUser, patTargetWxId, 0)
+                    WeNetSceneApi.sendNetScene(netScene)
+                }, "sendPat")
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendPat failed", e); false }
+    }
+
+    fun sendLocation(toUser: String, poiName: String, label: String, x: String, y: String, scale: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending location: $x,$y to $toUser")
+            val locJson = """{"msg":{"location":{"poiname":"$poiName","label":"$label","x":"$x","y":"$y","scale":"$scale"}}}"""
+            val netScene = ctorNetSceneSendMsgLocation.newInstance(toUser, locJson, 1, 0, null)
+            WeNetSceneApi.sendNetScene(netScene)
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendLocation failed", e); false }
+    }
+
+    /**
+     * Send a contact card.
+     * WAuxv m1784: AppMessage class (C2365) → new AppMessage(cardWxId) → static send (C2367).
+     */
+    fun sendShareCard(toUser: String, cardWxId: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending share card $cardWxId to $toUser")
+            val jSONObject = JSONObject()
+            val jSONObject2 = JSONObject()
+            jSONObject2.put("username", cardWxId)
+            val nickname = WeDatabaseApi.getDisplayName(cardWxId)
+            jSONObject2.put("nickname", nickname)
+            jSONObject2.put("certflag", if (cardWxId.startsWith("gh_")) 4928270286903575946L else 4928270274018674058L)
+            jSONObject.put("msg", jSONObject2)
+            val netScene = ctorNetSceneSendMsgLocation.newInstance(toUser, jSONObject.toString(), 1, 0, null)
+            WeNetSceneApi.sendNetScene(netScene)
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendShareCard failed", e); false }
+    }
+
+    fun sendVideo(toUser: String, videoPath: String): Boolean {
+        return try {
+            WeLogger.i(TAG, "sending video: $videoPath to $toUser")
+            val thread = ctorImportMultiVideo.newInstance(
+                HostInfo.application,
+                java.util.Collections.singletonList(videoPath),
+                null, toUser, 2, null, java.lang.Boolean.TRUE
+            ) as Thread
+            thread.start()
+            true
+        } catch (e: Exception) { WeLogger.e(TAG, "sendVideo failed", e); false }
     }
 
     override fun onEnable() {
