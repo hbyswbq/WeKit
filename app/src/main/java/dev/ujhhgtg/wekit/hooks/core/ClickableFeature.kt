@@ -4,7 +4,7 @@ import android.content.Context
 import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 
-abstract class ClickableHookItem : SwitchHookItem() {
+abstract class ClickableFeature : SwitchFeature() {
 
     override fun startup() {
         if (!TargetProcesses.isInMain) return

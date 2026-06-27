@@ -2,7 +2,7 @@ package dev.ujhhgtg.wekit.hooks.core
 
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 
-abstract class ApiHookItem : BaseHookItem() {
+abstract class ApiFeature : BaseFeature() {
 
     override fun startup() {
         if (!TargetProcesses.isInMain) return

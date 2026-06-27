@@ -6,7 +6,7 @@ import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 import dev.ujhhgtg.wekit.utils.WeLogger
 
-abstract class SwitchHookItem : BaseHookItem() {
+abstract class SwitchFeature : BaseFeature() {
 
     override fun startup() {
         if (!TargetProcesses.isInMain) return
@@ -24,12 +24,12 @@ abstract class SwitchHookItem : BaseHookItem() {
             _isEnabled = value
             if (!value) {
                 if (isLoaded) {
-                    WeLogger.i(nameOf(SwitchHookItem::class), "disabling $displayName...")
+                    WeLogger.i(nameOf(SwitchFeature::class), "disabling $displayName...")
                     disable()
                     isLoaded = false
                 }
             } else {
-                WeLogger.i(nameOf(SwitchHookItem::class), "enabling $displayName...")
+                WeLogger.i(nameOf(SwitchFeature::class), "enabling $displayName...")
                 enable()
                 isLoaded = true
             }

@@ -17,7 +17,7 @@ import org.luckypray.dexkit.DexKitBridge
 import java.lang.reflect.Executable
 import kotlin.reflect.KClass
 
-abstract class BaseHookItem {
+abstract class BaseFeature {
 
     var name: String = ""
     var categories: List<String> = emptyList()
@@ -189,6 +189,6 @@ abstract class BaseHookItem {
     }
 
     companion object {
-        private val TAG = nameOf(BaseHookItem::class)
+        private val TAG = nameOf(BaseFeature::class)
     }
 }
