@@ -462,7 +462,7 @@ object AutoLikeMoments : ClickableFeature(),
 
     private fun isIntercepted(snsInfo: Any): Boolean {
         // Check if the moments content contains the interception marker
-        val content = WeMomentsApi.getContent(snsInfo) ?: return false
+        val content = WeMomentsApi.getContentText(snsInfo) ?: return false
         return content.contains(AntiMomentsDelete.INTERCEPT_MARK)
     }
 

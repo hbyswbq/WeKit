@@ -2,6 +2,7 @@
 -dontobfuscate
 -keepnames class * implements dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 -keep class com.alibaba.fastjson2.** { *; }
+-keep class okhttp3.** { *; }
 
 # Attributes
 -keepattributes Signature,RuntimeVisibleAnnotations,AnnotationDefault,LineNumberTable,SourceFile,*Annotation*

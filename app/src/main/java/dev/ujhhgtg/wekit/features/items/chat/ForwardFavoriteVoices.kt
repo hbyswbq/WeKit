@@ -16,7 +16,6 @@ import dev.ujhhgtg.wekit.ui.content.TextButton
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.RuntimeConfig
-import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.copyToClipboard
 import dev.ujhhgtg.wekit.utils.android.getTopMostActivity
 import dev.ujhhgtg.wekit.utils.android.showToast
@@ -35,17 +34,12 @@ object ForwardFavoriteVoices : SwitchFeature() {
         "com.tencent.mm.plugin.fav.ui.FavSelectUI".toClass().reflekt().firstMethod { name = "onItemClick" }
         .hookBefore {
             val view = args[1] as View
-            WeLogger.i("DebugForwardFavoriteVoices", "view: ${view.javaClass.name}")
 
             val tag = view.tag
-            WeLogger.i("DebugForwardFavoriteVoices", "tag: ${tag.javaClass.name}")
 
             val a = tag.reflekt().firstField { name = "a"; superclass() }.get()!!
 
-            WeLogger.i("DebugForwardFavoriteVoices", "a: ${a.javaClass.name}")
             val type = a.reflekt().firstField { name = "field_type"; superclass() }.get()!! as Int
-
-            WeLogger.i("DebugForwardFavoriteVoices", "field_type: $type")
 
             if (type != 3) return@hookBefore
 
@@ -54,10 +48,8 @@ object ForwardFavoriteVoices : SwitchFeature() {
 
             val favInfo = ProtoBuf.decodeFromByteArray<FavInfoProto>(bytes)
             val voiceInfo = favInfo.voiceInfo
-            WeLogger.i("DebugForwardFavoriteVoices", "voiceInfo: $voiceInfo")
 
             var voiceFilePath = voiceInfo.filePath
-            WeLogger.i("DebugForwardFavoriteVoices", "voiceFilePath: $voiceFilePath")
 
             if (voiceFilePath == null) {
                 val baseStorageDir = RuntimeConfig.userDataDir
@@ -66,8 +58,6 @@ object ForwardFavoriteVoices : SwitchFeature() {
 
                 voiceFilePath = (baseStorageDir / "favorite" / bucketId.toString() / "$cacheName.${voiceInfo.fileCacheType}").absolutePathString()
             }
-
-            WeLogger.i("DebugForwardFavoriteVoices", "voiceFilePath 2: $voiceFilePath")
 
             val ctx = thisObject as Activity
 

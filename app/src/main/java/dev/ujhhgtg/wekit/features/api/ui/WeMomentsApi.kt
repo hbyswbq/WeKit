@@ -9,6 +9,7 @@ import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexConstructor
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
+import dev.ujhhgtg.wekit.features.api.net.models.protobuf.TimelineObjectProto
 import dev.ujhhgtg.wekit.features.core.ApiFeature
 import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.utils.WeLogger
@@ -16,6 +17,11 @@ import dev.ujhhgtg.wekit.utils.reflection.bool
 import dev.ujhhgtg.wekit.utils.reflection.int
 import dev.ujhhgtg.wekit.utils.reflection.long
 import dev.ujhhgtg.wekit.utils.reflection.void
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
+import java.io.InputStream
+import java.io.OutputStream
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
@@ -169,6 +175,157 @@ object WeMomentsApi : ApiFeature(), IResolveDex {
         }
     }
 
+    val methodAddImageMediaObjByPath by dexMethod {
+        searchPackages("com.tencent.mm.plugin.sns.model")
+        matcher {
+            declaredClass(classUploadPackHelper.clazz)
+            returnType(bool)
+            paramCount(2)
+            paramTypes(String::class.java, String::class.java)
+            usingStrings("addImageMediaObjByPath", "com.tencent.mm.plugin.sns.model.UploadPackHelper")
+        }
+    }
+
+    val methodAddSightObjectByPath by dexMethod {
+        searchPackages("com.tencent.mm.plugin.sns.model")
+        matcher {
+            declaredClass(classUploadPackHelper.clazz)
+            returnType(bool)
+            paramCount(4)
+            paramTypes(String::class.java, String::class.java, String::class.java, String::class.java)
+            usingStrings("addSightObjectByPath", "com.tencent.mm.plugin.sns.model.UploadPackHelper")
+        }
+    }
+
+    val classSnsUtil by dexClass {
+        matcher {
+            usingEqStrings("MicroMsg.SnsUtil", "getSnsBigName")
+        }
+    }
+
+    val methodGetSnsBigName by dexMethod {
+        matcher {
+            declaredClass(classSnsUtil.clazz)
+            usingEqStrings("getSnsBigName")
+        }
+    }
+
+    val methodGetSnsThumbName by dexMethod {
+        matcher {
+            declaredClass(classSnsUtil.clazz)
+            usingEqStrings("getSnsThumbName")
+        }
+    }
+
+    val classSnsPathHelper by dexClass {
+        matcher {
+            usingEqStrings("getImageFilePath", "com.tencent.mm.plugin.sns.model.SnsPathHelper")
+        }
+    }
+
+    val methodGetMediaFilePath by dexMethod {
+        matcher {
+            declaredClass(classSnsPathHelper.clazz)
+            usingEqStrings("getMediaFilePath")
+        }
+    }
+
+    val classSnsVideoLogic by dexClass {
+        matcher {
+            usingEqStrings("MicroMsg.SnsVideoLogic", "getSnsVideoPath", "com.tencent.mm.plugin.sns.model.SnsVideoLogic")
+        }
+    }
+
+    val methodGetSnsVideoPath by dexMethod {
+        matcher {
+            declaredClass(classSnsVideoLogic.clazz)
+            usingEqStrings("getSnsVideoPath")
+        }
+    }
+
+    val methodGetSnsVideoThumbImagePath by dexMethod {
+        matcher {
+            declaredClass(classSnsVideoLogic.clazz)
+            usingEqStrings("getSnsVideoThumbImagePath")
+        }
+    }
+
+    val classSnsCore by dexClass {
+        matcher {
+            usingEqStrings("com.tencent.mm.plugin.sns.model.SnsCore", "getSnsInfoStorage")
+        }
+    }
+
+    val methodGetAccSnsPath by dexMethod {
+        matcher {
+            declaredClass(classSnsCore.clazz)
+            modifiers = Modifier.STATIC
+            paramCount(0)
+            returnType(String::class.java)
+            usingStrings("getAccSnsPath", "com.tencent.mm.plugin.sns.model.SnsCore")
+        }
+    }
+
+    val classVfs by dexClass {
+        searchPackages("com.tencent.mm.vfs")
+        matcher {
+            usingEqStrings("MicroMsg.VFSFileOp", "readFileAsString(\"%s\" failed: %s")
+        }
+    }
+
+    val vfsReadMethod by lazy {
+        classVfs.reflekt().firstMethod {
+            modifiers(Modifiers.STATIC)
+            parameters(String::class)
+            returnType = InputStream::class
+        }
+    }
+
+    val vfsCopyMethod by lazy {
+        classVfs.reflekt().firstMethod {
+            modifiers(Modifiers.STATIC)
+            parameters(String::class, Boolean::class)
+            returnType = OutputStream::class
+        }
+    }
+
+    val vfsExistsMethod by lazy {
+        classVfs.reflekt().firstMethod {
+            modifiers(Modifiers.STATIC)
+            parameters(String::class)
+            returnType = Boolean::class
+        }
+    }
+
+    fun copyVfsFile(src: String, dest: String): Boolean {
+        return try {
+            val input = vfsReadMethod.invoke(null, src) as? InputStream ?: return false
+            val output = vfsCopyMethod.invoke(null, dest, false) as? OutputStream
+            if (output == null) {
+                input.close()
+                return false
+            }
+            input.use { inStream ->
+                output.use { outStream ->
+                    inStream.copyTo(outStream)
+                }
+            }
+            true
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "failed to copy VFS file from $src to $dest", e)
+            false
+        }
+    }
+
+    fun vfsFileExists(path: String): Boolean {
+        return try {
+            vfsExistsMethod.invoke(null, path) as Boolean
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "failed to check VFS file exists: $path", e)
+            false
+        }
+    }
+
     fun uploadText(content: String, sdkId: String? = null, sdkAppName: String? = null): Boolean {
         return try {
             val helper = ctorUploadPackHelper.constructor.newInstance(2, null)
@@ -255,10 +412,42 @@ object WeMomentsApi : ApiFeature(), IResolveDex {
         return normalized.reflekt().firstMethodOrNull { name = "isDeadSource"; parameters(); superclass() }?.invoke() as? Boolean == true
     }
 
-    fun getContent(snsInfo: Any?): String? {
+    fun getContent(snsInfo: Any?): ByteArray? {
         val normalized = normalizeSnsInfo(snsInfo) ?: return null
-        return normalized.reflekt().firstMethodOrNull { name = "getContent"; parameters(); superclass() }?.invoke() as? String
-            ?: normalized.reflekt().firstFieldOrNull { name = "field_content"; superclass() }?.get() as? String
+        return normalized.reflekt().firstFieldOrNull { name = "field_content"; superclass() }?.get() as? ByteArray
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun getContentText(snsInfo: Any?): String? {
+        val bytes = getContent(snsInfo) ?: return null
+        return try {
+            val proto = ProtoBuf.decodeFromByteArray<TimelineObjectProto>(bytes)
+            proto.contentDesc
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "failed to decode TimeLineObjectProto", e)
+            null
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun getTimelineProto(snsInfo: Any?): TimelineObjectProto? {
+        val bytes = getContent(snsInfo) ?: return null
+        return try {
+            ProtoBuf.decodeFromByteArray<TimelineObjectProto>(bytes)
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "failed to decode TimeLineObjectProto", e)
+            null
+        }
+    }
+
+    val classMediaObj: Class<*> by lazy {
+        classUploadPackHelper.clazz.declaredMethods.first {
+            it.parameterTypes.size == 3 &&
+            it.parameterTypes[0] == String::class.java &&
+            it.parameterTypes[1] == Int::class.javaPrimitiveType &&
+            it.parameterTypes[2] == String::class.java &&
+            it.returnType != Void.TYPE
+        }.returnType
     }
 
     fun isLiked(context: WeMomentsContextMenuApi.MomentsContext): Boolean =
@@ -322,9 +511,14 @@ object WeMomentsApi : ApiFeature(), IResolveDex {
 
     private fun normalizeSnsInfo(snsInfo: Any?): Any? {
         if (snsInfo == null) return null
-        return runCatching {
-            if (snsInfoClass.isInstance(snsInfo)) return snsInfo
 
+        return runCatching {
+            if (snsInfoClass.isInstance(snsInfo)) {
+                WeLogger.d(TAG, "snsInfo is SnsInfo, returning directly")
+                return snsInfo
+            }
+
+            WeLogger.d(TAG, "unwrapping snsInfo...")
             snsInfo.javaClass.reflekt()
                 .firstMethodOrNull {
                     parameterCount = 0
@@ -333,7 +527,7 @@ object WeMomentsApi : ApiFeature(), IResolveDex {
                 }
                 ?.invoke(snsInfo)
         }.getOrElse { error ->
-            WeLogger.e(TAG, "failed to normalize Moments snsInfo", error)
+            WeLogger.e(TAG, "failed to normalize snsInfo", error)
             null
         }
     }

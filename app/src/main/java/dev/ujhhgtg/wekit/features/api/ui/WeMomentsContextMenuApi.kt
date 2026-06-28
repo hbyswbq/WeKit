@@ -6,11 +6,13 @@ import android.view.ContextMenu
 import de.robv.android.xposed.XC_MethodHook
 import dev.ujhhgtg.comptime.nameOf
 import dev.ujhhgtg.reflekt.reflekt
+import dev.ujhhgtg.reflekt.utils.Modifiers
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.core.ApiFeature
 import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.utils.WeLogger
+import dev.ujhhgtg.wekit.utils.reflection.BString
 import java.lang.reflect.Modifier
 
 @Feature(name = "朋友圈菜单增强扩展", categories = ["API"], description = "为朋友圈消息长按菜单提供添加菜单项功能")
@@ -42,7 +44,7 @@ object WeMomentsContextMenuApi : ApiFeature(), IResolveDex {
     data class MomentsContext(
         val activity: Activity,
         val snsInfo: Any?,
-        val timeLineObject: Any?
+        val timelineObject: Any?
     )
 
     private val methodOnCreateMenu by dexMethod {
@@ -111,35 +113,38 @@ object WeMomentsContextMenuApi : ApiFeature(), IResolveDex {
 
     private fun handleSelectMenu(param: XC_MethodHook.MethodHookParam) {
         val menuItem = param.args.getOrNull(0) as? android.view.MenuItem ?: return
-        val hookedObject = param.thisObject
-        val fields = hookedObject.javaClass.declaredFields
 
-        val activity = fields.firstOrNull { it.type == Activity::class.java }
-            ?.apply { isAccessible = true }?.get(hookedObject) as Activity
+        param.thisObject.reflekt().apply {
+            val activity = firstField {
+                type = Activity::class
+            }.get()!! as Activity
 
-        val timeLineObject = fields.firstOrNull {
-            it.type.name == "com.tencent.mm.protocal.protobuf.TimeLineObject"
-        }?.apply { isAccessible = true }?.get(hookedObject)
+            val timeLineObject = firstFieldOrNull {
+                type = "com.tencent.mm.protocal.protobuf.TimeLineObject"
+            }?.get()
 
-        val snsID = fields.firstOrNull {
-            it.type == String::class.java && !Modifier.isFinal(it.modifiers)
-        }?.apply { isAccessible = true }?.get(hookedObject) as String
-        val targetMethod = methodSnsInfoStorage.method
-        val instance = methodGetSnsInfoStorage.method.invoke(null)
-        val snsInfo = targetMethod.invoke(instance, snsID)
+            val snsId = firstField {
+                type = BString
+                modifiers { !it.contains(Modifiers.FINAL) }
+            }.get()!! as String
 
-        val context = MomentsContext(activity, snsInfo, timeLineObject)
-        val clickedId = menuItem.itemId
+            val targetMethod = methodSnsInfoStorage.method
+            val instance = methodGetSnsInfoStorage.method.invoke(null)
+            val snsInfo = targetMethod.invoke(instance, snsId)
 
-        for (item in menuItems.values.flatten()) {
-            try {
-                if (item.id == clickedId) {
-                    item.onClick(context)
+            val context = MomentsContext(activity, snsInfo, timeLineObject)
+            val clickedId = menuItem.itemId
+
+            for (item in menuItems.values.flatten()) {
+                try {
+                    if (item.id == clickedId) {
+                        item.onClick(context)
+                        param.result = null
+                        return
+                    }
+                } catch (e: Throwable) {
+                    WeLogger.e(TAG, "onSelect callback failed", e)
                 }
-                param.result = null
-                return
-            } catch (e: Throwable) {
-                WeLogger.e(TAG, "onSelect callback failed", e)
             }
         }
     }

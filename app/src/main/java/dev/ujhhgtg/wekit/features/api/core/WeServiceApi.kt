@@ -225,11 +225,9 @@ object WeServiceApi : ApiFeature(), IResolveDex {
     }
 
     val videoPathFeatureService by lazy {
-        classVideoService.reflekt()
-            .firstMethod {
-                modifiers(Modifiers.STATIC)
-                returnType = methodVideoPathFeatureServiceRestoreMp4Path.method.declaringClass
-            }.invokeStatic()!!
+        getServiceByClass(methodVideoPathFeatureServiceRestoreMp4Path
+                .method.declaringClass
+                .interfaces[0])
     }
 
     fun getVideoMp4PathFromMsgInfo(msgInfo: MessageInfo): String {
